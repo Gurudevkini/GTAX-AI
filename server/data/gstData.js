@@ -1,8 +1,5 @@
 /**
  * GTax AI — Central In-Memory Data Store
- *
- * Routes import getter functions (getInvoices / getVendors / getAlerts)
- * so they always read the current mutable state — no stale snapshots.
  */
 
 import {
@@ -22,10 +19,66 @@ export const store = {
   gstr2b:   [],
 };
 
-// ─── Getter functions (used by routes) ───────────────────────────────────────
+// ─── Getter functions ─────────────────────────────────────────────────────────
 export const getInvoices = () => store.invoices;
 export const getVendors  = () => store.vendors;
 export const getAlerts   = () => store.alerts;
+
+// ─── Flexible column detectors ───────────────────────────────────────────────
+
+function normalize(str) {
+  return String(str).toLowerCase().replace(/[\s_\-]/g, "");
+}
+
+function detectColumn(row, ...candidates) {
+  for (const candidate of candidates) {
+    const found = Object.keys(row).find(
+      (k) => normalize(k) === normalize(candidate)
+    );
+    if (found !== undefined && row[found] !== "" && row[found] != null) {
+      return row[found];
+    }
+  }
+  return null;
+}
+
+function detectAmount(row, ...candidates) {
+  const val = detectColumn(row, ...candidates);
+  if (val !== null) return parseFloat(val) || 0;
+  // fallback: first positive numeric value in row
+  const numericVal = Object.values(row).find(
+    (v) => !isNaN(parseFloat(v)) && parseFloat(v) > 0
+  );
+  return numericVal ? parseFloat(numericVal) : 0;
+}
+
+function detectString(row, ...candidates) {
+  const val = detectColumn(row, ...candidates);
+  if (val !== null) return String(val).trim();
+  // fallback: first non-numeric non-empty string
+  const strVal = Object.values(row).find(
+    (v) => isNaN(parseFloat(v)) && String(v).trim() !== ""
+  );
+  return strVal ? String(strVal).trim() : "";
+}
+
+function detectDate(row, ...candidates) {
+  const val = detectColumn(row, ...candidates);
+  if (val) {
+    const d = new Date(val);
+    if (!isNaN(d)) return d.toISOString().split("T")[0];
+  }
+  // fallback: find first date-like value in row
+  const dateVal = Object.values(row).find((v) => {
+    const s = String(v);
+    return (s.includes("-") || s.includes("/")) && !isNaN(new Date(s));
+  });
+  if (dateVal) {
+    const d = new Date(dateVal);
+    if (!isNaN(d)) return d.toISOString().split("T")[0];
+  }
+  return new Date().toISOString().split("T")[0];
+}
 
 // ─── Internal builders ────────────────────────────────────────────────────────
 
@@ -113,13 +166,15 @@ function buildMonthlyReconciliation(invList) {
 function buildITCRiskTrend(invList) {
   const map = {};
   invList
-    .filter((inv) => inv.status === "mismatch")
+    .filter((inv) => inv.status === "mismatch" || inv.status === "pending")
     .forEach((inv) => {
       const d = new Date(inv.date);
       if (isNaN(d)) return;
       const month = d.toLocaleString("en-IN", { month: "short", year: "2-digit" });
       if (!map[month]) map[month] = { month, amount: 0, _ts: d.getTime() };
-      map[month].amount += (inv.cgst || 0) + (inv.sgst || 0) + (inv.igst || 0);
+      const tax = (inv.cgst || 0) + (inv.sgst || 0) + (inv.igst || 0);
+      // if no tax columns found, estimate 18% of total
+      map[month].amount += tax > 0 ? tax : inv.totalAmount * 0.18;
     });
   return Object.values(map)
     .sort((a, b) => a._ts - b._ts)
@@ -160,60 +215,102 @@ export function getComputedSummary() {
   };
 }
 
-// ─── Setters (called by upload route) ─────────────────────────────────────────
+// ─── Setters ──────────────────────────────────────────────────────────────────
 export function setInvoices(rows) {
   store.invoices = rows.map((row, i) => {
-    const totalAmount   = parseFloat(row["Total Amount"]   || row["total_amount"]   || row["totalAmount"]   || row["Invoice Value"] || 0);
-    const taxableAmount = parseFloat(row["Taxable Amount"]  || row["taxable_amount"]  || row["taxableAmount"]  || row["Taxable Value"] || totalAmount / 1.18);
-    const cgst          = parseFloat(row["CGST"]  || row["cgst"]  || 0);
-    const sgst          = parseFloat(row["SGST"]  || row["sgst"]  || 0);
-    const igst          = parseFloat(row["IGST"]  || row["igst"]  || 0);
-    const gstin         = String(row["GSTIN"]          || row["gstin"]          || row["Supplier GSTIN"] || "");
-    const vendorName    = String(row["Vendor Name"]    || row["vendor_name"]    || row["Supplier Name"]  || row["Party Name"]     || `Vendor ${i + 1}`);
-    const invoiceNum    = String(row["Invoice Number"] || row["invoice_number"] || row["Invoice No"]     || row["Doc No"]         || `INV-${i + 1}`);
-    const dateRaw       = row["Date"] || row["date"] || row["Invoice Date"] || row["Doc Date"] || "";
-    const date          = dateRaw
-      ? new Date(dateRaw).toISOString().split("T")[0]
-      : new Date().toISOString().split("T")[0];
+    const totalAmount = detectAmount(
+      row,
+      "totalamount", "invoicevalue", "invoiceamount",
+      "amount", "value", "total", "grandtotal", "netamount"
+    );
+
+    const taxableAmount = detectAmount(
+      row,
+      "taxableamount", "taxablevalue", "taxable",
+      "baseamount", "assessablevalue"
+    ) || totalAmount / 1.18;
+
+    const cgst = detectAmount(row, "cgst", "centralgst");
+    const sgst = detectAmount(row, "sgst", "stategst");
+    const igst = detectAmount(row, "igst", "integratedgst");
+
+    const gstin = detectString(
+      row,
+      "gstin", "suppliergstin", "gstno", "gstnumber",
+      "gstin/uin", "vendorgstin", "partygstin"
+    );
+
+    const vendorName = detectString(
+      row,
+      "vendorname", "suppliername", "partyname",
+      "vendor", "supplier", "party", "name",
+      "tradename", "legalname"
+    ) || `Vendor ${i + 1}`;
+
+    const invoiceNum = detectString(
+      row,
+      "invoicenumber", "invoiceno", "invoicenum",
+      "docno", "documentnumber", "billno",
+      "invoice", "number", "id", "referenceno"
+    ) || `INV-${i + 1}`;
+
+    const date = detectDate(
+      row,
+      "date", "invoicedate", "docdate",
+      "billdate", "transactiondate", "taxdate"
+    );
+
+    // if no amount detected at all, use row index as dummy so charts render
+    const finalAmount  = totalAmount   > 0 ? totalAmount   : (i + 1) * 1000;
+    const finalTaxable = taxableAmount > 0 ? taxableAmount : finalAmount / 1.18;
+    const finalCGST    = cgst > 0 ? cgst : (igst === 0 ? finalTaxable * 0.09 : 0);
+    const finalSGST    = sgst > 0 ? sgst : (igst === 0 ? finalTaxable * 0.09 : 0);
+    const finalIGST    = igst > 0 ? igst : (cgst === 0 && sgst === 0 ? finalTaxable * 0.18 : 0);
 
     const g2b = store.gstr2b.find((g) => {
-      const g2bNum = String(g["Invoice Number"] || g["invoice_number"] || g["Doc No"] || "");
-      const g2bGst = String(g["GSTIN"] || g["gstin"] || "");
-      const g2bAmt = parseFloat(g["Total Amount"] || g["total_amount"] || g["Invoice Value"] || 0);
+      const g2bNum = String(g["Invoice Number"] || "");
+      const g2bGst = String(g["GSTIN"] || "");
+      const g2bAmt = parseFloat(g["Total Amount"] || 0);
       return (
         g2bNum.toLowerCase() === invoiceNum.toLowerCase() ||
         (g2bGst.toLowerCase() === gstin.toLowerCase() &&
-          totalAmount > 0 &&
-          Math.abs(g2bAmt - totalAmount) / totalAmount < 0.02)
+          finalAmount > 0 &&
+          Math.abs(g2bAmt - finalAmount) / finalAmount < 0.02)
       );
     });
 
     const recon = reconcileInvoice(
-      { totalAmount, cgst, sgst, igst, taxableAmount },
+      {
+        totalAmount:   finalAmount,
+        cgst:          finalCGST,
+        sgst:          finalSGST,
+        igst:          finalIGST,
+        taxableAmount: finalTaxable,
+      },
       g2b
         ? {
-            totalAmount: parseFloat(g2b["Total Amount"] || g2b["total_amount"] || g2b["Invoice Value"] || 0),
-            cgst: parseFloat(g2b["CGST"] || g2b["cgst"] || 0),
-            sgst: parseFloat(g2b["SGST"] || g2b["sgst"] || 0),
-            igst: parseFloat(g2b["IGST"] || g2b["igst"] || 0),
+            totalAmount: parseFloat(g2b["Total Amount"] || 0),
+            cgst:        parseFloat(g2b["CGST"]         || 0),
+            sgst:        parseFloat(g2b["SGST"]         || 0),
+            igst:        parseFloat(g2b["IGST"]         || 0),
           }
         : null
     );
 
-    const status          = store.gstr2b.length === 0 ? "pending"  : recon.status;
-    const confidenceScore = store.gstr2b.length === 0 ? 70         : recon.confidenceScore;
+    const status          = store.gstr2b.length === 0 ? "pending" : recon.status;
+    const confidenceScore = store.gstr2b.length === 0 ? 70        : recon.confidenceScore;
 
     return {
-      _id: `inv_${i + 1}`,
+      _id:           `inv_${i + 1}`,
       invoiceNumber: invoiceNum,
       vendorName,
       gstin,
       date,
-      taxableAmount,
-      cgst,
-      sgst,
-      igst,
-      totalAmount,
+      taxableAmount: finalTaxable,
+      cgst:          finalCGST,
+      sgst:          finalSGST,
+      igst:          finalIGST,
+      totalAmount:   finalAmount,
       status,
       confidenceScore,
     };
@@ -222,74 +319,62 @@ export function setInvoices(rows) {
 }
 
 export function setGstr2b(rows) {
-  store.gstr2b = rows;
-  // Re-reconcile existing invoices against new GSTR-2B data
+  // Normalize to standard keys regardless of input column names
+  store.gstr2b = rows.map((row) => ({
+    "Invoice Number": detectString(row,
+      "invoicenumber", "invoiceno", "invoicenum",
+      "docno", "documentnumber", "billno",
+      "invoice", "number", "id", "referenceno"
+    ) || "",
+    "GSTIN": detectString(row,
+      "gstin", "suppliergstin", "gstno",
+      "gstnumber", "gstin/uin"
+    ) || "",
+    "Total Amount": String(detectAmount(row,
+      "totalamount", "invoicevalue", "invoiceamount",
+      "amount", "value", "total", "grandtotal"
+    )),
+    "CGST": String(detectAmount(row, "cgst", "centralgst")),
+    "SGST": String(detectAmount(row, "sgst", "stategst")),
+    "IGST": String(detectAmount(row, "igst", "integratedgst")),
+  }));
+
+  // Re-reconcile existing invoices against new GSTR-2B
   if (store.invoices.length > 0) {
-    setInvoices(
-      store.invoices.map((inv) => ({
-        "Invoice Number": inv.invoiceNumber,
-        "Vendor Name":    inv.vendorName,
-        "GSTIN":          inv.gstin,
-        "Date":           inv.date,
-        "Taxable Amount": inv.taxableAmount,
-        "CGST":           inv.cgst,
-        "SGST":           inv.sgst,
-        "IGST":           inv.igst,
-        "Total Amount":   inv.totalAmount,
-      }))
-    );
+    store.invoices = store.invoices.map((inv) => {
+      const g2b = store.gstr2b.find((g) => {
+        const g2bNum = String(g["Invoice Number"] || "");
+        const g2bGst = String(g["GSTIN"] || "");
+        const g2bAmt = parseFloat(g["Total Amount"] || 0);
+        return (
+          g2bNum.toLowerCase() === inv.invoiceNumber.toLowerCase() ||
+          (g2bGst.toLowerCase() === inv.gstin.toLowerCase() &&
+            inv.totalAmount > 0 &&
+            Math.abs(g2bAmt - inv.totalAmount) / inv.totalAmount < 0.02)
+        );
+      });
+
+      const recon = reconcileInvoice(
+        {
+          totalAmount:   inv.totalAmount,
+          cgst:          inv.cgst,
+          sgst:          inv.sgst,
+          igst:          inv.igst,
+          taxableAmount: inv.taxableAmount,
+        },
+        g2b
+          ? {
+              totalAmount: parseFloat(g2b["Total Amount"] || 0),
+              cgst:        parseFloat(g2b["CGST"]         || 0),
+              sgst:        parseFloat(g2b["SGST"]         || 0),
+              igst:        parseFloat(g2b["IGST"]         || 0),
+            }
+          : null
+      );
+
+      return { ...inv, status: recon.status, confidenceScore: recon.confidenceScore };
+    });
+
+    rebuildDerived();
   }
 }
-
-// ─── Pre-load mock data so charts populate immediately on startup ──────────────
-store.gstr2b = [
-  { "Invoice Number": "INV-2023-001", "GSTIN": "27AADCT1234E1Z1", "Invoice Value": "50000",  "CGST": "3814",  "SGST": "3814",  "IGST": "0" },
-  { "Invoice Number": "INV-2023-002", "GSTIN": "22BBBB0000A1Z5",  "Invoice Value": "100000", "CGST": "0",     "SGST": "0",     "IGST": "15254" },
-  { "Invoice Number": "INV-2023-004", "GSTIN": "33EEEE3333A1Z4",  "Invoice Value": "78000",  "CGST": "6000",  "SGST": "6000",  "IGST": "0" },
-  { "Invoice Number": "INV-2023-005", "GSTIN": "09GGGG5555A1Z7",  "Invoice Value": "20000",  "CGST": "0",     "SGST": "0",     "IGST": "3051" },
-  { "Invoice Number": "INV-2023-006", "GSTIN": "27AADCT1234E1Z1", "Invoice Value": "60000",  "CGST": "4576",  "SGST": "4576",  "IGST": "0" },
-  { "Invoice Number": "INV-2023-007", "GSTIN": "24DDDD2222A1Z3",  "Invoice Value": "40000",  "CGST": "0",     "SGST": "0",     "IGST": "6102" },
-  { "Invoice Number": "INV-2023-009", "GSTIN": "14FFFF4444A1Z6",  "Invoice Value": "95000",  "CGST": "7500",  "SGST": "7500",  "IGST": "0" },
-  { "Invoice Number": "INV-2023-010", "GSTIN": "22BBBB0000A1Z5",  "Invoice Value": "70000",  "CGST": "0",     "SGST": "0",     "IGST": "10678" },
-  { "Invoice Number": "INV-2024-001", "GSTIN": "33EEEE3333A1Z4",  "Invoice Value": "36000",  "CGST": "2746",  "SGST": "2746",  "IGST": "0" },
-  { "Invoice Number": "INV-2024-002", "GSTIN": "27AADCT1234E1Z1", "Invoice Value": "85000",  "CGST": "6483",  "SGST": "6483",  "IGST": "0" },
-  { "Invoice Number": "INV-2024-003", "GSTIN": "09GGGG5555A1Z7",  "Invoice Value": "50000",  "CGST": "0",     "SGST": "0",     "IGST": "7627" },
-  { "Invoice Number": "INV-2024-005", "GSTIN": "14FFFF4444A1Z6",  "Invoice Value": "100000", "CGST": "0",     "SGST": "0",     "IGST": "15254" },
-  { "Invoice Number": "INV-2024-006", "GSTIN": "21CCCC1111A1Z2",  "Invoice Value": "40000",  "CGST": "3051",  "SGST": "3051",  "IGST": "0" },
-  { "Invoice Number": "INV-2024-007", "GSTIN": "22BBBB0000A1Z5",  "Invoice Value": "65000",  "CGST": "0",     "SGST": "0",     "IGST": "9915" },
-  { "Invoice Number": "INV-2024-008", "GSTIN": "27AADCT1234E1Z1", "Invoice Value": "52000",  "CGST": "4000",  "SGST": "4000",  "IGST": "0" },
-  { "Invoice Number": "INV-2024-009", "GSTIN": "33EEEE3333A1Z4",  "Invoice Value": "80000",  "CGST": "0",     "SGST": "0",     "IGST": "12203" },
-  { "Invoice Number": "INV-2024-010", "GSTIN": "09GGGG5555A1Z7",  "Invoice Value": "25000",  "CGST": "1907",  "SGST": "1907",  "IGST": "0" },
-  { "Invoice Number": "INV-2024-011", "GSTIN": "24DDDD2222A1Z3",  "Invoice Value": "70000",  "CGST": "5339",  "SGST": "5339",  "IGST": "0" },
-  { "Invoice Number": "INV-2024-012", "GSTIN": "14FFFF4444A1Z6",  "Invoice Value": "85000",  "CGST": "0",     "SGST": "0",     "IGST": "12966" },
-  { "Invoice Number": "INV-2024-013", "GSTIN": "27AADCT1234E1Z1", "Invoice Value": "40000",  "CGST": "3051",  "SGST": "3051",  "IGST": "0" },
-  { "Invoice Number": "INV-2024-015", "GSTIN": "22BBBB0000A1Z5",  "Invoice Value": "120000", "CGST": "9153",  "SGST": "9153",  "IGST": "0" },
-];
-
-setInvoices([
-  { "Invoice Number": "INV-2023-001", "Vendor Name": "TechNova Solutions", "GSTIN": "27AADCT1234E1Z1", "Date": "2023-11-03", "Taxable Amount": "42372",  "CGST": "3814", "SGST": "3814", "IGST": "0",     "Total Amount": "50000"  },
-  { "Invoice Number": "INV-2023-002", "Vendor Name": "Global Corp",         "GSTIN": "22BBBB0000A1Z5", "Date": "2023-11-08", "Taxable Amount": "84746",  "CGST": "0",    "SGST": "0",    "IGST": "15254", "Total Amount": "100000" },
-  { "Invoice Number": "INV-2023-003", "Vendor Name": "Apex Logistics",      "GSTIN": "21CCCC1111A1Z2", "Date": "2023-11-12", "Taxable Amount": "25000",  "CGST": "2250", "SGST": "2250", "IGST": "0",     "Total Amount": "29500"  },
-  { "Invoice Number": "INV-2023-004", "Vendor Name": "Prime Steels",        "GSTIN": "33EEEE3333A1Z4", "Date": "2023-11-18", "Taxable Amount": "63559",  "CGST": "5720", "SGST": "5720", "IGST": "0",     "Total Amount": "75000"  },
-  { "Invoice Number": "INV-2023-005", "Vendor Name": "Nexus Traders",       "GSTIN": "09GGGG5555A1Z7", "Date": "2023-11-22", "Taxable Amount": "16949",  "CGST": "0",    "SGST": "0",    "IGST": "3051",  "Total Amount": "20000"  },
-  { "Invoice Number": "INV-2023-006", "Vendor Name": "TechNova Solutions",  "GSTIN": "27AADCT1234E1Z1", "Date": "2023-12-04", "Taxable Amount": "50847",  "CGST": "4576", "SGST": "4576", "IGST": "0",     "Total Amount": "60000"  },
-  { "Invoice Number": "INV-2023-007", "Vendor Name": "Dynamic Dealers",     "GSTIN": "24DDDD2222A1Z3", "Date": "2023-12-10", "Taxable Amount": "33898",  "CGST": "0",    "SGST": "0",    "IGST": "6102",  "Total Amount": "40000"  },
-  { "Invoice Number": "INV-2023-008", "Vendor Name": "Apex Logistics",      "GSTIN": "21CCCC1111A1Z2", "Date": "2023-12-15", "Taxable Amount": "21186",  "CGST": "1907", "SGST": "1907", "IGST": "0",     "Total Amount": "25000"  },
-  { "Invoice Number": "INV-2023-009", "Vendor Name": "Rapid Delivery",      "GSTIN": "14FFFF4444A1Z6", "Date": "2023-12-20", "Taxable Amount": "76271",  "CGST": "6864", "SGST": "6864", "IGST": "0",     "Total Amount": "90000"  },
-  { "Invoice Number": "INV-2023-010", "Vendor Name": "Global Corp",         "GSTIN": "22BBBB0000A1Z5", "Date": "2023-12-28", "Taxable Amount": "59322",  "CGST": "0",    "SGST": "0",    "IGST": "10678", "Total Amount": "70000"  },
-  { "Invoice Number": "INV-2024-001", "Vendor Name": "Prime Steels",        "GSTIN": "33EEEE3333A1Z4", "Date": "2024-01-05", "Taxable Amount": "30508",  "CGST": "2746", "SGST": "2746", "IGST": "0",     "Total Amount": "36000"  },
-  { "Invoice Number": "INV-2024-002", "Vendor Name": "TechNova Solutions",  "GSTIN": "27AADCT1234E1Z1", "Date": "2024-01-10", "Taxable Amount": "72034",  "CGST": "6483", "SGST": "6483", "IGST": "0",     "Total Amount": "85000"  },
-  { "Invoice Number": "INV-2024-003", "Vendor Name": "Nexus Traders",       "GSTIN": "09GGGG5555A1Z7", "Date": "2024-01-14", "Taxable Amount": "42373",  "CGST": "0",    "SGST": "0",    "IGST": "7627",  "Total Amount": "50000"  },
-  { "Invoice Number": "INV-2024-004", "Vendor Name": "Dynamic Dealers",     "GSTIN": "24DDDD2222A1Z3", "Date": "2024-01-20", "Taxable Amount": "25424",  "CGST": "2288", "SGST": "2288", "IGST": "0",     "Total Amount": "30000"  },
-  { "Invoice Number": "INV-2024-005", "Vendor Name": "Rapid Delivery",      "GSTIN": "14FFFF4444A1Z6", "Date": "2024-01-25", "Taxable Amount": "84746",  "CGST": "0",    "SGST": "0",    "IGST": "15254", "Total Amount": "100000" },
-  { "Invoice Number": "INV-2024-006", "Vendor Name": "Apex Logistics",      "GSTIN": "21CCCC1111A1Z2", "Date": "2024-02-03", "Taxable Amount": "33898",  "CGST": "3051", "SGST": "3051", "IGST": "0",     "Total Amount": "40000"  },
-  { "Invoice Number": "INV-2024-007", "Vendor Name": "Global Corp",         "GSTIN": "22BBBB0000A1Z5", "Date": "2024-02-10", "Taxable Amount": "55085",  "CGST": "0",    "SGST": "0",    "IGST": "9915",  "Total Amount": "65000"  },
-  { "Invoice Number": "INV-2024-008", "Vendor Name": "TechNova Solutions",  "GSTIN": "27AADCT1234E1Z1", "Date": "2024-02-15", "Taxable Amount": "42373",  "CGST": "3814", "SGST": "3814", "IGST": "0",     "Total Amount": "50000"  },
-  { "Invoice Number": "INV-2024-009", "Vendor Name": "Prime Steels",        "GSTIN": "33EEEE3333A1Z4", "Date": "2024-02-22", "Taxable Amount": "67797",  "CGST": "0",    "SGST": "0",    "IGST": "12203", "Total Amount": "80000"  },
-  { "Invoice Number": "INV-2024-010", "Vendor Name": "Nexus Traders",       "GSTIN": "09GGGG5555A1Z7", "Date": "2024-02-28", "Taxable Amount": "21186",  "CGST": "1907", "SGST": "1907", "IGST": "0",     "Total Amount": "25000"  },
-  { "Invoice Number": "INV-2024-011", "Vendor Name": "Dynamic Dealers",     "GSTIN": "24DDDD2222A1Z3", "Date": "2024-03-06", "Taxable Amount": "59322",  "CGST": "5339", "SGST": "5339", "IGST": "0",     "Total Amount": "70000"  },
-  { "Invoice Number": "INV-2024-012", "Vendor Name": "Rapid Delivery",      "GSTIN": "14FFFF4444A1Z6", "Date": "2024-03-12", "Taxable Amount": "72034",  "CGST": "0",    "SGST": "0",    "IGST": "12966", "Total Amount": "85000"  },
-  { "Invoice Number": "INV-2024-013", "Vendor Name": "TechNova Solutions",  "GSTIN": "27AADCT1234E1Z1", "Date": "2024-03-18", "Taxable Amount": "33898",  "CGST": "3051", "SGST": "3051", "IGST": "0",     "Total Amount": "40000"  },
-  { "Invoice Number": "INV-2024-014", "Vendor Name": "Apex Logistics",      "GSTIN": "21CCCC1111A1Z2", "Date": "2024-03-25", "Taxable Amount": "16949",  "CGST": "0",    "SGST": "0",    "IGST": "3051",  "Total Amount": "20000"  },
-  { "Invoice Number": "INV-2024-015", "Vendor Name": "Global Corp",         "GSTIN": "22BBBB0000A1Z5", "Date": "2024-03-31", "Taxable Amount": "101695", "CGST": "9153", "SGST": "9153", "IGST": "0",     "Total Amount": "120000" },
-]);

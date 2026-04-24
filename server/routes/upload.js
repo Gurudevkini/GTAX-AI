@@ -16,27 +16,32 @@ const upload = multer({
       .slice(file.originalname.lastIndexOf("."))
       .toLowerCase();
     const allowedExts = [".csv", ".xlsx", ".xls"];
-
-    // Always allow by extension — MIME type is unreliable across browsers/OS.
-    // e.g. Chrome on Windows sends text/plain for CSV; some OS sends "".
-    if (allowedExts.includes(ext)) {
-      return cb(null, true);
-    }
-
+    if (allowedExts.includes(ext)) return cb(null, true);
     cb(new Error(`Unsupported file type "${ext}". Use .csv, .xlsx, or .xls`));
   },
 });
 
-// ── Parse Excel / CSV buffer into row objects ─────────────────────────────────
+// ── Parse Excel / CSV buffer → row objects ────────────────────────────────────
+// KEY FIX: cellDates:true tells XLSX to convert Excel date serial numbers
+// (e.g. 45291) into real JavaScript Date objects BEFORE we call sheet_to_json.
+// Without this, new Date(45291) = 45 seconds after Unix epoch = "Jan 1970".
 function parseFileBuffer(buffer) {
-  const workbook = XLSX.read(buffer, { type: "buffer" });
+  const workbook = XLSX.read(buffer, {
+    type: "buffer",
+    cellDates: true,   // ← THE FIX: Excel date serials → JS Date objects
+    cellNF: false,
+    cellText: false,
+  });
   const sheetName = workbook.SheetNames[0];
   const sheet = workbook.Sheets[sheetName];
-  const rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+
+  // raw:false ensures date cells that XLSX parsed as Date objects stay as
+  // Date objects (not turned back into serial numbers by sheet_to_json).
+  const rows = XLSX.utils.sheet_to_json(sheet, { defval: "", raw: false });
   return { sheetName, rowCount: rows.length, rows };
 }
 
-// ── POST /upload/reset — wipe all in-memory data ──────────────────────────────
+// ── POST /upload/reset ────────────────────────────────────────────────────────
 router.post("/reset", (_req, res) => {
   try {
     setInvoices([]);
@@ -48,10 +53,6 @@ router.post("/reset", (_req, res) => {
 });
 
 // ── POST /upload/invoices  |  POST /upload/gstr2b ─────────────────────────────
-//
-// Using the callback form of upload.single() so multer errors (wrong MIME,
-// file too large, etc.) are caught and returned as proper JSON — not 500 crashes.
-//
 router.post("/:type", (req, res) => {
   const { type } = req.params;
 
@@ -61,7 +62,6 @@ router.post("/:type", (req, res) => {
       .json({ success: false, message: "Type must be 'invoices' or 'gstr2b'" });
   }
 
-  // Run multer manually so we can intercept its errors
   upload.single("file")(req, res, (multerErr) => {
     if (multerErr) {
       console.error("Multer error:", multerErr.message);
