@@ -80,32 +80,6 @@ const Navbar = () => {
 
       {/* RIGHT — Health score + logout */}
       <FlexBetween gap="1rem">
-        <FlexBetween
-          gap="0.5rem"
-          sx={{
-            background: healthBg,
-            border: `1px solid ${healthBorder}`,
-            borderRadius: "20px",
-            padding: "4px 14px",
-          }}
-        >
-          <Box
-            sx={{
-              width: 7,
-              height: 7,
-              borderRadius: "50%",
-              background: healthColor,
-              animation: "pulse 2s infinite",
-              "@keyframes pulse": {
-                "0%, 100%": { opacity: 1 },
-                "50%": { opacity: 0.4 },
-              },
-            }}
-          />
-          <Typography fontSize="11px" fontWeight={600} color={healthColor}>
-            Health Score: {healthScore} / 100
-          </Typography>
-        </FlexBetween>
 
         <Box
           sx={{
