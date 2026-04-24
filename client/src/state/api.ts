@@ -1,19 +1,19 @@
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 import { Invoice, Vendor, Alert, GSTSummary } from "./types";
 
-// ─── FIX 1: ensure baseUrl always ends with "/" ───────────────────────────────
-// RTK fetchBaseQuery concatenates baseUrl + endpoint string directly.
-// "http://localhost:9000" + "upload/invoices" = "http://localhost:9000upload/invoices" ❌
-// "http://localhost:9000/" + "upload/invoices" = "http://localhost:9000/upload/invoices" ✅
 const rawBase: string = import.meta.env.VITE_BASE_URL ?? "http://localhost:9000/";
 const baseUrl = rawBase.endsWith("/") ? rawBase : rawBase + "/";
 
+export interface AuthUser {
+  _id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  gstin: string;
+}
+
 export const api = createApi({
-  baseQuery: fetchBaseQuery({
-    baseUrl,
-    // ⚠️  Do NOT put a global Content-Type header here.
-    //     It would override the multipart/form-data boundary for file uploads.
-  }),
+  baseQuery: fetchBaseQuery({ baseUrl }),
   reducerPath: "main",
   tagTypes: ["Invoices", "Vendors", "Alerts", "Summary"],
   endpoints: (build) => ({
@@ -33,15 +33,6 @@ export const api = createApi({
       query: () => "summary/gst-summary/",
       providesTags: ["Summary"],
     }),
-
-    // ─── FIX 2: formData: true ──────────────────────────────────────────────
-    // Without this flag, fetchBaseQuery calls JSON.stringify(formData) → sends
-    // body="{}" with Content-Type: application/json → multer gets no file →
-    // req.file is undefined → upload fails every single time.
-    //
-    // With formData: true, RTK passes the FormData object directly to fetch().
-    // fetch() then sets Content-Type: multipart/form-data; boundary=<uuid>
-    // automatically, multer reads it correctly, req.file is populated. ✅
     uploadFile: build.mutation<
       { success: boolean; rowCount: number; data: Invoice[]; fileName: string },
       { type: "invoices" | "gstr2b"; file: File }
@@ -50,22 +41,29 @@ export const api = createApi({
         const formData = new FormData();
         formData.append("file", file);
         return {
-          url:      `upload/${type}`,
-          method:   "POST",
-          body:     formData,
-          formData: true,   // ← THE critical flag. Do not remove.
+          url: `upload/${type}`,
+          method: "POST",
+          body: formData,
+          formData: true,
         };
       },
       invalidatesTags: ["Invoices", "Vendors", "Alerts", "Summary"],
     }),
-
-    // ─── Reset: wipe all server-side in-memory data ─────────────────────────
     resetData: build.mutation<{ success: boolean; message: string }, void>({
-      query: () => ({
-        url:    "upload/reset",
-        method: "POST",
-      }),
+      query: () => ({ url: "upload/reset", method: "POST" }),
       invalidatesTags: ["Invoices", "Vendors", "Alerts", "Summary"],
+    }),
+    login: build.mutation<
+      { success: boolean; token: string; user: AuthUser },
+      { email: string; password: string }
+    >({
+      query: (body) => ({ url: "auth/login", method: "POST", body }),
+    }),
+    register: build.mutation<
+      { success: boolean; token: string; user: AuthUser },
+      { firstName: string; lastName: string; email: string; gstin?: string; password: string }
+    >({
+      query: (body) => ({ url: "auth/register", method: "POST", body }),
     }),
   }),
 });
@@ -77,4 +75,6 @@ export const {
   useGetGSTSummaryQuery,
   useUploadFileMutation,
   useResetDataMutation,
+  useLoginMutation,
+  useRegisterMutation,
 } = api;

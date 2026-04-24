@@ -1,15 +1,22 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Box, Typography, useTheme } from "@mui/material";
 import FlexBetween from "@/components/FlexBetween";
 import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
 
 const Navbar = () => {
   const { palette } = useTheme();
+  const navigate = useNavigate();
   const [selected, setSelected] = useState("dashboard");
 
+  const handleLogout = () => {
+    localStorage.removeItem("gtax_token");
+    localStorage.removeItem("gtax_user");
+    window.location.href = "/login";
+  };
+
   const navItem = (label: string, path: string, key: string) => (
-    <Box sx={{ "&:hover": { color: palette.primary[100] } }}>
+    <Box key={key} sx={{ "&:hover": { color: palette.primary[100] } }}>
       <Link
         to={path}
         onClick={() => setSelected(key)}
@@ -46,13 +53,7 @@ const Navbar = () => {
           <ReceiptLongIcon sx={{ fontSize: "18px", color: "#1a1d23" }} />
         </Box>
         <Box>
-          <Typography
-            variant="h4"
-            fontSize="16px"
-            fontWeight={700}
-            color={palette.grey[200]}
-            letterSpacing="-0.3px"
-          >
+          <Typography variant="h4" fontSize="16px" fontWeight={700} color={palette.grey[200]} letterSpacing="-0.3px">
             GTax AI
           </Typography>
           <Typography variant="h6" fontSize="10px" color={palette.grey[700]}>
@@ -61,39 +62,54 @@ const Navbar = () => {
         </Box>
       </FlexBetween>
 
-      {/* RIGHT — Nav links */}
+      {/* CENTER — Nav links */}
       <FlexBetween gap="2rem">
         {navItem("Dashboard", "/", "dashboard")}
         {navItem("Vendors", "/vendors", "vendors")}
         {navItem("Alerts", "/alerts", "alerts")}
       </FlexBetween>
 
-      {/* Right side — health indicator */}
-      <FlexBetween
-        gap="0.5rem"
-        sx={{
-          background: `rgba(18,239,200,0.08)`,
-          border: `1px solid rgba(18,239,200,0.2)`,
-          borderRadius: "20px",
-          padding: "4px 14px",
-        }}
-      >
-        <Box
+      {/* RIGHT — Health score + logout */}
+      <FlexBetween gap="1rem">
+        <FlexBetween
+          gap="0.5rem"
           sx={{
-            width: 7,
-            height: 7,
-            borderRadius: "50%",
-            background: palette.primary[500],
-            animation: "pulse 2s infinite",
-            "@keyframes pulse": {
-              "0%, 100%": { opacity: 1 },
-              "50%": { opacity: 0.4 },
-            },
+            background: "rgba(18,239,200,0.08)",
+            border: "1px solid rgba(18,239,200,0.2)",
+            borderRadius: "20px",
+            padding: "4px 14px",
           }}
-        />
-        <Typography fontSize="11px" fontWeight={600} color={palette.primary[400]}>
-          Health Score: 72 / 100
-        </Typography>
+        >
+          <Box
+            sx={{
+              width: 7,
+              height: 7,
+              borderRadius: "50%",
+              background: palette.primary[500],
+              animation: "pulse 2s infinite",
+              "@keyframes pulse": {
+                "0%, 100%": { opacity: 1 },
+                "50%": { opacity: 0.4 },
+              },
+            }}
+          />
+          <Typography fontSize="11px" fontWeight={600} color={palette.primary[400]}>
+            Health Score: 72 / 100
+          </Typography>
+        </FlexBetween>
+
+        <Box
+          onClick={handleLogout}
+          sx={{
+            cursor: "pointer",
+            fontSize: "11px",
+            color: palette.grey[700],
+            "&:hover": { color: "#ff5252" },
+            transition: "color 0.15s",
+          }}
+        >
+          Sign out
+        </Box>
       </FlexBetween>
     </FlexBetween>
   );
