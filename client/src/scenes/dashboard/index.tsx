@@ -54,12 +54,32 @@ interface UploadState {
   error: string;
 }
 
+// ── localStorage persistence helpers ─────────────────────────────────────────
+const UPLOAD_STATE_KEY = "gtax_upload_state";
+
 const initState = (): UploadState => ({
   status: "idle",
   fileName: "",
   count: 0,
   error: "",
 });
+
+const loadPersistedUploadState = (): { invoiceState: UploadState; gstr2bState: UploadState } => {
+  try {
+    const raw = localStorage.getItem(UPLOAD_STATE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch (_) {}
+  return { invoiceState: initState(), gstr2bState: initState() };
+};
+
+const persistUploadState = (invoiceState: UploadState, gstr2bState: UploadState) => {
+  localStorage.setItem(UPLOAD_STATE_KEY, JSON.stringify({ invoiceState, gstr2bState }));
+};
+
+const clearPersistedUploadState = () => {
+  localStorage.removeItem(UPLOAD_STATE_KEY);
+};
+// ─────────────────────────────────────────────────────────────────────────────
 
 const Dashboard = () => {
   const { palette } = useTheme();
@@ -75,8 +95,10 @@ const Dashboard = () => {
   });
   const user = JSON.parse(localStorage.getItem("gtax_user") || "{}");
 
-  const [invoiceState, setInvoiceState] = useState<UploadState>(initState());
-  const [gstr2bState, setGstr2bState] = useState<UploadState>(initState());
+  // ── Restore upload state from localStorage on mount (survives navigation) ──
+  const persisted = loadPersistedUploadState();
+  const [invoiceState, setInvoiceState] = useState<UploadState>(persisted.invoiceState);
+  const [gstr2bState, setGstr2bState] = useState<UploadState>(persisted.gstr2bState);
 
   // Global banner: shown after any upload attempt
   const [banner, setBanner] = useState<{
@@ -86,25 +108,23 @@ const Dashboard = () => {
     body: string;
   }>({ show: false, type: "success", title: "", body: "" });
 
-  // ── Sync upload state on page load/refresh ────────────────────────────────
-  // If the server already has invoices in memory (e.g. after a browser refresh),
-  // reflect that in the UI so the upload panel doesn't misleadingly show "idle".
+  // ── Sync against server truth ─────────────────────────────────────────────
+  // If the server has no data (e.g. it restarted), clear the persisted state
+  // so the UI doesn't falsely show "success" with a stale file name.
   const { data: existingInvoices } = useGetInvoicesQuery();
 
   useEffect(() => {
-    if (existingInvoices && existingInvoices.length > 0) {
-      setInvoiceState({
-        status: "success",
-        fileName: "(previously loaded)",
-        count: existingInvoices.length,
-        error: "",
-      });
-    } else if (existingInvoices && existingInvoices.length === 0) {
-      // Server has no data — ensure UI is also reset
+    if (existingInvoices && existingInvoices.length === 0) {
       setInvoiceState(initState());
       setGstr2bState(initState());
+      clearPersistedUploadState();
     }
   }, [existingInvoices]);
+
+  // ── Persist to localStorage whenever upload states change ─────────────────
+  useEffect(() => {
+    persistUploadState(invoiceState, gstr2bState);
+  }, [invoiceState, gstr2bState]);
 
   // ── Clear all data ────────────────────────────────────────────────────────
   const handleReset = async () => {
@@ -112,6 +132,7 @@ const Dashboard = () => {
       await resetData().unwrap();
       setInvoiceState(initState());
       setGstr2bState(initState());
+      clearPersistedUploadState();
       setBanner({
         show: true,
         type: "success",
@@ -199,12 +220,10 @@ const Dashboard = () => {
 
   const handleUpgrade = async (plan: string) => {
     try {
-      // Try API but don't block on failure (demo/mock mode)
       await updateUser({ planType: plan }).unwrap().catch(() => null);
     } catch (_) {
       // ignore
     }
-    // Always update locally
     const stored = JSON.parse(localStorage.getItem("gtax_user") || "{}");
     stored.planType = plan;
     localStorage.setItem("gtax_user", JSON.stringify(stored));
