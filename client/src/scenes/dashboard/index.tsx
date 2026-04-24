@@ -19,6 +19,18 @@ import { useUploadFileMutation, useResetDataMutation, useGetInvoicesQuery, useUp
 import UpgradeModal from "@/components/UpgradeModal";
 import PremiumLock, { PlanType } from "@/components/PremiumLock";
 
+// ── Grid layout ───────────────────────────────────────────────────────────────
+// Column layout: 3 equal columns
+// Row assignments (10 rows total):
+//   a,b,c  → rows 1-3   (charts)
+//   a,b,f  → row 4      (charts + alerts top)
+//   d,e,f  → rows 5-6   (GST summary, pie, alerts)
+//   d,h,i  → row 7      (summary bottom, vendor top, ITC top)
+//   g,h,i  → rows 8-9   (invoice ledger, vendor mid, ITC bottom)
+//   g,h,j  → row 10     (invoice ledger, vendor bottom, health score)
+//
+// Key fix: i spans rows 7-9 (3 rows) and j spans row 10 (1 row).
+// Previously they shared the same rows as h which caused right-side overflow.
 const gridTemplateLargeScreens = `
   "a b c"
   "a b c"
@@ -109,8 +121,6 @@ const Dashboard = () => {
   }>({ show: false, type: "success", title: "", body: "" });
 
   // ── Sync against server truth ─────────────────────────────────────────────
-  // If the server has no data (e.g. it restarted), clear the persisted state
-  // so the UI doesn't falsely show "success" with a stale file name.
   const { data: existingInvoices } = useGetInvoicesQuery();
 
   useEffect(() => {
@@ -157,7 +167,6 @@ const Dashboard = () => {
     event.target.value = "";
     if (!file) return;
 
-    // Validate — only CSV / Excel
     const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
     if (!["csv", "xlsx", "xls"].includes(ext)) {
       setBanner({
@@ -178,7 +187,6 @@ const Dashboard = () => {
       return;
     }
 
-    // FEATURE GATING LOGIC — Free tier: 1 upload/month
     if (currentPlan === "free" && (user.usageCount || 0) >= 1) {
       setIsModalOpen(true);
       return;
@@ -221,9 +229,7 @@ const Dashboard = () => {
   const handleUpgrade = async (plan: string) => {
     try {
       await updateUser({ planType: plan }).unwrap().catch(() => null);
-    } catch (_) {
-      // ignore
-    }
+    } catch (_) {}
     const stored = JSON.parse(localStorage.getItem("gtax_user") || "{}");
     stored.planType = plan;
     localStorage.setItem("gtax_user", JSON.stringify(stored));
@@ -234,7 +240,6 @@ const Dashboard = () => {
       body: `You are now on the ${plan.toUpperCase()} plan. All features are now unlocked!`
     });
   };
-
 
   const renderUploadButton = (
     type: "invoices" | "gstr2b",
@@ -275,7 +280,6 @@ const Dashboard = () => {
           }}
         >
           {isUploading ? `Uploading ${state.fileName}…` : label}
-          {/* CRITICAL: accept only CSV/Excel — hides PPT, PDF, images, etc. */}
           <input
             type="file"
             hidden
@@ -285,7 +289,6 @@ const Dashboard = () => {
           />
         </Button>
 
-        {/* Per-button status line */}
         <Box mt="6px" minHeight="18px" display="flex" alignItems="center" gap="6px">
           {state.status === "success" && (
             <>
@@ -315,9 +318,9 @@ const Dashboard = () => {
 
   return (
     <>
-      <UpgradeModal 
-        open={isModalOpen} onClose={() => setIsModalOpen(false)} 
-        onUpgrade={handleUpgrade} currentPlan={user.planType || "free"} 
+      <UpgradeModal
+        open={isModalOpen} onClose={() => setIsModalOpen(false)}
+        onUpgrade={handleUpgrade} currentPlan={user.planType || "free"}
       />
 
       {/* ── Upload Panel ─────────────────────────────────────────────────── */}
@@ -344,7 +347,6 @@ const Dashboard = () => {
           </Box>
 
           <Box display="flex" gap="0.75rem" alignItems="center">
-            {/* Loaded counts pill */}
             {(["invoices", "gstr2b"] as const).map((t) => {
               const s = t === "invoices" ? invoiceState : gstr2bState;
               const loaded = s.status === "success";
@@ -385,7 +387,6 @@ const Dashboard = () => {
               );
             })}
 
-            {/* Clear Data button — only shown when data exists */}
             {invoiceState.status === "success" && (
               <Button
                 variant="outlined"
@@ -420,22 +421,8 @@ const Dashboard = () => {
 
         {/* Upload buttons */}
         <Box display="flex" flexDirection={{ xs: "column", md: "row" }} gap="1.5rem">
-          {renderUploadButton(
-            "invoices",
-            invoiceState,
-            "Upload Invoices",
-            "#12efe8",
-            "#0ecfc9",
-            "#0a1628"
-          )}
-          {renderUploadButton(
-            "gstr2b",
-            gstr2bState,
-            "Upload GSTR-2B",
-            "#6870fa",
-            "#535ad6",
-            "#ffffff"
-          )}
+          {renderUploadButton("invoices", invoiceState, "Upload Invoices", "#12efe8", "#0ecfc9", "#0a1628")}
+          {renderUploadButton("gstr2b", gstr2bState, "Upload GSTR-2B", "#6870fa", "#535ad6", "#ffffff")}
         </Box>
 
         {/* ── Alert Banner ──────────────────────────────────────────────── */}
@@ -478,8 +465,8 @@ const Dashboard = () => {
       {/* ── Conditional Dashboard Grid or Empty State ─────────────────────── */}
       {!(invoiceState.status === "success" && gstr2bState.status === "success") ? (
         <Box
-          m="1.5rem 2.5rem"
-          width="100%"
+          mx="2.5rem"
+          my="1.5rem"
           display="flex"
           flexDirection="column"
           alignItems="center"
@@ -515,16 +502,19 @@ const Dashboard = () => {
         </Box>
       ) : (
         <Box
-          m="1.5rem 2.5rem"
-          width="100%"
-          height="100%"
+          mx="2.5rem"
+          my="1.5rem"
           display="grid"
           gap="1.5rem"
           sx={
             isAboveMediumScreens
               ? {
-                  gridTemplateColumns: "repeat(3, minmax(370px, 1fr))",
-                  gridTemplateRows: "repeat(10, minmax(60px, 1fr))",
+                  gridTemplateColumns: "repeat(3, 1fr)",
+                  // 10 rows total. Boxes a/b/c span rows 1-4, d/e span rows 5-6,
+                  // g spans rows 8-10, h spans rows 7-10 — so each row ~60px gives:
+                  //   charts (4 rows) = 240px + gaps, summary (2 rows) = 120px,
+                  //   tables (4 rows) = 240px
+                  gridTemplateRows: "repeat(10, 60px)",
                   gridTemplateAreas: gridTemplateLargeScreens,
                 }
               : {

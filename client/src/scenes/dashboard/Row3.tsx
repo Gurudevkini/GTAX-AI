@@ -77,6 +77,10 @@ const Row3 = ({ currentPlan, onUpgraded }: Row3Props) => {
   const healthScore = summary?.healthScore ?? 0;
   const healthColor = healthScore >= 75 ? palette.primary[500] : healthScore >= 50 ? "#f2b455" : "#ff5252";
 
+  const itcRiskPct = summary && summary.totalITC > 0
+    ? ((summary.itcAtRisk / summary.totalITC) * 100).toFixed(1)
+    : "0.0";
+
   return (
     <>
       {/* Box G — Invoice DataGrid — CA+ */}
@@ -122,66 +126,142 @@ const Row3 = ({ currentPlan, onUpgraded }: Row3Props) => {
       </DashboardBox>
 
       {/* Box I — ITC Summary — CA+ */}
-      <DashboardBox gridArea="i">
+      <DashboardBox gridArea="i" sx={{ overflow: "hidden" }}>
         <PremiumLock requiredPlan="ca" currentPlan={currentPlan} badge="CA Plan" label="ITC Summary" onUpgraded={onUpgraded}>
-          <BoxHeader title="ITC Summary" subtitle="input tax credit position" sideText="" />
-          <Box mt="0.2rem" p="0 1rem" display="flex" flexDirection="column" gap="0.3rem">
-            {[
-              { label: "Total ITC Available", value: `₹${((summary?.totalITC ?? 0) / 100000).toFixed(2)}L`, color: palette.primary[400] },
-              { label: "ITC at Risk", value: `₹${((summary?.itcAtRisk ?? 0) / 100000).toFixed(2)}L`, color: "#ff5252" },
-              { label: "GST Payable", value: `₹${((summary?.gstPayable ?? 0) / 100000).toFixed(2)}L`, color: palette.secondary[400] },
-            ].map((item) => (
-              <FlexBetween key={item.label} pb="4px" sx={{ borderBottom: `1px solid ${palette.grey[800]}` }}>
-                <Typography variant="h6" fontSize="10px">{item.label}</Typography>
-                <Typography sx={{ fontSize: "12px", fontWeight: 700, color: item.color, fontFamily: "IBM Plex Mono, monospace" }}>
-                  {item.value}
+          <Box
+            display="flex"
+            flexDirection="column"
+            height="100%"
+            overflow="hidden"
+          >
+            <BoxHeader title="ITC Summary" subtitle="input tax credit position" sideText="" />
+            <Box
+              p="0 1rem 0.5rem 1rem"
+              display="flex"
+              flexDirection="column"
+              gap="0.25rem"
+              flex={1}
+              overflow="hidden"
+            >
+              {[
+                { label: "Total ITC Available", value: `₹${((summary?.totalITC ?? 0) / 100000).toFixed(2)}L`, color: palette.primary[400] },
+                { label: "ITC at Risk", value: `₹${((summary?.itcAtRisk ?? 0) / 100000).toFixed(2)}L`, color: "#ff5252" },
+                { label: "GST Payable", value: `₹${((summary?.gstPayable ?? 0) / 100000).toFixed(2)}L`, color: palette.secondary[400] },
+              ].map((item) => (
+                <FlexBetween
+                  key={item.label}
+                  pb="0.25rem"
+                  sx={{ borderBottom: `1px solid ${palette.grey[800]}` }}
+                >
+                  <Typography variant="h6" fontSize="10px" color={palette.grey[500]}>
+                    {item.label}
+                  </Typography>
+                  <Typography
+                    sx={{
+                      fontSize: "11px",
+                      fontWeight: 700,
+                      color: item.color,
+                      fontFamily: "IBM Plex Mono, monospace",
+                    }}
+                  >
+                    {item.value}
+                  </Typography>
+                </FlexBetween>
+              ))}
+
+              {/* Risk bar */}
+              <Box mt="0.25rem">
+                <Typography variant="h6" fontSize="9px" mb="0.2rem" color={palette.grey[600]}>
+                  ITC Risk Percentage
                 </Typography>
-              </FlexBetween>
-            ))}
-            <Box mt="0.2rem">
-              <Typography variant="h6" fontSize="9px" mb="0.2rem">ITC Risk Percentage</Typography>
-              <Box sx={{ height: "6px", background: palette.grey[800], borderRadius: "3px", overflow: "hidden" }}>
                 <Box
                   sx={{
-                    height: "100%",
-                    width: `${summary ? (summary.itcAtRisk / summary.totalITC) * 100 : 0}%`,
-                    background: `linear-gradient(90deg, #ff5252, #ff8a80)`,
+                    height: "5px",
+                    background: palette.grey[800],
                     borderRadius: "3px",
+                    overflow: "hidden",
                   }}
-                />
+                >
+                  <Box
+                    sx={{
+                      height: "100%",
+                      width: `${summary ? (summary.itcAtRisk / summary.totalITC) * 100 : 0}%`,
+                      background: `linear-gradient(90deg, #ff5252, #ff8a80)`,
+                      borderRadius: "3px",
+                    }}
+                  />
+                </Box>
+                <Typography variant="h6" fontSize="9px" mt="0.2rem" color="#ff5252">
+                  {itcRiskPct}% of ITC at risk
+                </Typography>
               </Box>
-              <Typography variant="h6" fontSize="9px" mt="0.2rem" color="#ff5252">
-                {summary ? ((summary.itcAtRisk / summary.totalITC) * 100).toFixed(1) : 0}% of ITC at risk
-              </Typography>
             </Box>
           </Box>
         </PremiumLock>
       </DashboardBox>
 
       {/* Box J — Health Score — CA+ */}
-      <DashboardBox gridArea="j">
+      <DashboardBox gridArea="j" sx={{ overflow: "hidden" }}>
         <PremiumLock requiredPlan="ca" currentPlan={currentPlan} badge="CA Plan" label="GST Health Score" onUpgraded={onUpgraded}>
-          <BoxHeader title="GST Health Score" subtitle="overall compliance rating" sideText="" />
-          <FlexBetween p="0.5rem 1.5rem" gap="1rem">
-            <Box textAlign="center">
-              <Typography sx={{ fontSize: "48px", fontWeight: 800, color: healthColor, fontFamily: "IBM Plex Mono, monospace", lineHeight: 1 }}>
-                {healthScore}
-              </Typography>
-              <Typography variant="h6" fontSize="10px" mt="0.3rem">out of 100</Typography>
-            </Box>
-            <Box flex={1}>
-              <Box sx={{ height: "10px", background: palette.grey[800], borderRadius: "5px", overflow: "hidden", mb: "0.4rem" }}>
-                <Box sx={{ height: "100%", width: `${healthScore}%`, background: healthColor, borderRadius: "5px", transition: "width 0.6s ease" }} />
+          <Box display="flex" flexDirection="column" height="100%" overflow="hidden">
+            <BoxHeader title="GST Health Score" subtitle="overall compliance rating" sideText="" />
+            <FlexBetween p="0.25rem 1rem 0.5rem 1rem" gap="1rem" flex={1} overflow="hidden">
+              <Box textAlign="center" flexShrink={0}>
+                <Typography
+                  sx={{
+                    fontSize: "42px",
+                    fontWeight: 800,
+                    color: healthColor,
+                    fontFamily: "IBM Plex Mono, monospace",
+                    lineHeight: 1,
+                  }}
+                >
+                  {healthScore}
+                </Typography>
+                <Typography variant="h6" fontSize="9px" mt="0.25rem" color={palette.grey[600]}>
+                  out of 100
+                </Typography>
               </Box>
-              <Typography variant="h6" fontSize="10px">
-                {healthScore >= 75
-                  ? "Compliance is strong. Keep up reconciliation frequency."
-                  : healthScore >= 50
-                  ? "Moderate risk. Resolve mismatches to improve ITC claims."
-                  : "High risk. Multiple vendors and invoices need urgent attention."}
-              </Typography>
-            </Box>
-          </FlexBetween>
+              <Box flex={1} overflow="hidden">
+                <Box
+                  sx={{
+                    height: "8px",
+                    background: palette.grey[800],
+                    borderRadius: "4px",
+                    overflow: "hidden",
+                    mb: "0.35rem",
+                  }}
+                >
+                  <Box
+                    sx={{
+                      height: "100%",
+                      width: `${healthScore}%`,
+                      background: healthColor,
+                      borderRadius: "4px",
+                      transition: "width 0.6s ease",
+                    }}
+                  />
+                </Box>
+                <Typography
+                  variant="h6"
+                  fontSize="10px"
+                  color={palette.grey[400]}
+                  sx={{
+                    display: "-webkit-box",
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: "vertical",
+                    overflow: "hidden",
+                  }}
+                >
+                  {healthScore >= 75
+                    ? "Compliance is strong. Keep up reconciliation frequency."
+                    : healthScore >= 50
+                    ? "Moderate risk. Resolve mismatches to improve ITC claims."
+                    : "High risk. Multiple vendors and invoices need urgent attention."}
+                </Typography>
+              </Box>
+            </FlexBetween>
+          </Box>
         </PremiumLock>
       </DashboardBox>
     </>
