@@ -28,20 +28,7 @@ export const getVendors  = () => store.vendors;
 export const getAlerts   = () => store.alerts;
 
 // ─── Seed data ────────────────────────────────────────────────────────────────
-store.invoices = [
-  { _id: "inv001", invoiceNumber: "INV-2024-001", vendorName: "Tata Supplies Ltd",   gstin: "27AABCT3518Q1ZV", date: "2024-04-05", taxableAmount: 50000,  cgst: 4500,  sgst: 4500,  igst: 0,     totalAmount: 59000,  status: "matched",  confidenceScore: 97 },
-  { _id: "inv002", invoiceNumber: "INV-2024-002", vendorName: "Reliance Traders",    gstin: "27AABCR1234Q1ZV", date: "2024-04-08", taxableAmount: 120000, cgst: 10800, sgst: 10800, igst: 0,     totalAmount: 141600, status: "mismatch", confidenceScore: 42 },
-  { _id: "inv003", invoiceNumber: "INV-2024-003", vendorName: "Infosys Vendors",     gstin: "29AABCI1234Q1ZV", date: "2024-04-10", taxableAmount: 75000,  cgst: 0,     sgst: 0,     igst: 13500, totalAmount: 88500,  status: "matched",  confidenceScore: 96 },
-  { _id: "inv004", invoiceNumber: "INV-2024-004", vendorName: "Sun Pharma Supplies", gstin: "24AABCS1234Q1ZV", date: "2024-04-12", taxableAmount: 30000,  cgst: 2700,  sgst: 2700,  igst: 0,     totalAmount: 35400,  status: "pending",  confidenceScore: 60 },
-  { _id: "inv005", invoiceNumber: "INV-2024-005", vendorName: "Mahindra Parts",      gstin: "27AABCM1234Q1ZV", date: "2024-04-15", taxableAmount: 95000,  cgst: 8550,  sgst: 8550,  igst: 0,     totalAmount: 112100, status: "mismatch", confidenceScore: 38 },
-  { _id: "inv006", invoiceNumber: "INV-2024-006", vendorName: "Wipro Services",      gstin: "29AABCW1234Q1ZV", date: "2024-05-02", taxableAmount: 60000,  cgst: 0,     sgst: 0,     igst: 10800, totalAmount: 70800,  status: "matched",  confidenceScore: 95 },
-  { _id: "inv007", invoiceNumber: "INV-2024-007", vendorName: "HDFC Vendors",        gstin: "27AABCH1234Q1ZV", date: "2024-05-08", taxableAmount: 45000,  cgst: 4050,  sgst: 4050,  igst: 0,     totalAmount: 53100,  status: "matched",  confidenceScore: 98 },
-  { _id: "inv008", invoiceNumber: "INV-2024-008", vendorName: "Bajaj Electricals",   gstin: "27AABCB1234Q1ZV", date: "2024-05-14", taxableAmount: 80000,  cgst: 7200,  sgst: 7200,  igst: 0,     totalAmount: 94400,  status: "mismatch", confidenceScore: 55 },
-  { _id: "inv009", invoiceNumber: "INV-2024-009", vendorName: "Asian Paints",        gstin: "27AABCA1234Q1ZV", date: "2024-05-20", taxableAmount: 25000,  cgst: 2250,  sgst: 2250,  igst: 0,     totalAmount: 29500,  status: "pending",  confidenceScore: 65 },
-  { _id: "inv010", invoiceNumber: "INV-2024-010", vendorName: "Tata Supplies Ltd",   gstin: "27AABCT3518Q1ZV", date: "2024-06-03", taxableAmount: 110000, cgst: 9900,  sgst: 9900,  igst: 0,     totalAmount: 129800, status: "matched",  confidenceScore: 97 },
-  { _id: "inv011", invoiceNumber: "INV-2024-011", vendorName: "Reliance Traders",    gstin: "27AABCR1234Q1ZV", date: "2024-06-10", taxableAmount: 55000,  cgst: 4950,  sgst: 4950,  igst: 0,     totalAmount: 64900,  status: "mismatch", confidenceScore: 30 },
-  { _id: "inv012", invoiceNumber: "INV-2024-012", vendorName: "Infosys Vendors",     gstin: "29AABCI1234Q1ZV", date: "2024-06-18", taxableAmount: 90000,  cgst: 0,     sgst: 0,     igst: 16200, totalAmount: 106200, status: "matched",  confidenceScore: 94 },
-];
+store.invoices = [];
 
 // ─── Internal builders ────────────────────────────────────────────────────────
 
