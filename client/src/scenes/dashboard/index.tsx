@@ -9,11 +9,12 @@ import {
   AlertTitle,
 } from "@mui/material";
 import UploadFileIcon from "@mui/icons-material/UploadFile";
-import { useState, type ChangeEvent } from "react";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+import { useState, useEffect, type ChangeEvent } from "react";
 import Row1 from "./Row1";
 import Row2 from "./Row2";
 import Row3 from "./Row3";
-import { useUploadFileMutation } from "@/state/api";
+import { useUploadFileMutation, useResetDataMutation, useGetInvoicesQuery } from "@/state/api";
 
 const gridTemplateLargeScreens = `
   "a b c"
@@ -60,6 +61,7 @@ const initState = (): UploadState => ({
 const Dashboard = () => {
   const isAboveMediumScreens = useMediaQuery("(min-width: 900px)");
   const [uploadFile] = useUploadFileMutation();
+  const [resetData, { isLoading: isResetting }] = useResetDataMutation();
 
   const [invoiceState, setInvoiceState] = useState<UploadState>(initState());
   const [gstr2bState, setGstr2bState] = useState<UploadState>(initState());
@@ -71,6 +73,48 @@ const Dashboard = () => {
     title: string;
     body: string;
   }>({ show: false, type: "success", title: "", body: "" });
+
+  // ── Sync upload state on page load/refresh ────────────────────────────────
+  // If the server already has invoices in memory (e.g. after a browser refresh),
+  // reflect that in the UI so the upload panel doesn't misleadingly show "idle".
+  const { data: existingInvoices } = useGetInvoicesQuery();
+
+  useEffect(() => {
+    if (existingInvoices && existingInvoices.length > 0) {
+      setInvoiceState({
+        status: "success",
+        fileName: "(previously loaded)",
+        count: existingInvoices.length,
+        error: "",
+      });
+    } else if (existingInvoices && existingInvoices.length === 0) {
+      // Server has no data — ensure UI is also reset
+      setInvoiceState(initState());
+      setGstr2bState(initState());
+    }
+  }, [existingInvoices]);
+
+  // ── Clear all data ────────────────────────────────────────────────────────
+  const handleReset = async () => {
+    try {
+      await resetData().unwrap();
+      setInvoiceState(initState());
+      setGstr2bState(initState());
+      setBanner({
+        show: true,
+        type: "success",
+        title: "Data Cleared",
+        body: "All invoices and GSTR-2B data have been wiped from the server. Upload new files to begin.",
+      });
+    } catch (err: any) {
+      setBanner({
+        show: true,
+        type: "error",
+        title: "Clear Failed",
+        body: err?.data?.message ?? "Could not clear data. Please try again.",
+      });
+    }
+  };
 
   const handleUpload = async (
     event: ChangeEvent<HTMLInputElement>,
@@ -237,8 +281,8 @@ const Dashboard = () => {
             </Typography>
           </Box>
 
-          {/* Loaded counts pill */}
-          <Box display="flex" gap="0.75rem">
+          <Box display="flex" gap="0.75rem" alignItems="center">
+            {/* Loaded counts pill */}
             {(["invoices", "gstr2b"] as const).map((t) => {
               const s = t === "invoices" ? invoiceState : gstr2bState;
               const loaded = s.status === "success";
@@ -278,6 +322,37 @@ const Dashboard = () => {
                 </Box>
               );
             })}
+
+            {/* Clear Data button — only shown when data exists */}
+            {invoiceState.status === "success" && (
+              <Button
+                variant="outlined"
+                size="small"
+                disabled={isResetting}
+                onClick={handleReset}
+                startIcon={
+                  isResetting
+                    ? <CircularProgress size={12} color="inherit" />
+                    : <DeleteOutlineIcon sx={{ fontSize: "14px" }} />
+                }
+                sx={{
+                  fontSize: "11px",
+                  fontWeight: 600,
+                  textTransform: "none",
+                  borderRadius: "20px",
+                  px: "14px",
+                  py: "6px",
+                  borderColor: "rgba(255,82,82,0.35)",
+                  color: "#ff5252",
+                  "&:hover": {
+                    borderColor: "#ff5252",
+                    background: "rgba(255,82,82,0.08)",
+                  },
+                }}
+              >
+                {isResetting ? "Clearing…" : "Clear Data"}
+              </Button>
+            )}
           </Box>
         </Box>
 

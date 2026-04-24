@@ -58,6 +58,15 @@ export const api = createApi({
       },
       invalidatesTags: ["Invoices", "Vendors", "Alerts", "Summary"],
     }),
+
+    // ─── Reset: wipe all server-side in-memory data ─────────────────────────
+    resetData: build.mutation<{ success: boolean; message: string }, void>({
+      query: () => ({
+        url:    "upload/reset",
+        method: "POST",
+      }),
+      invalidatesTags: ["Invoices", "Vendors", "Alerts", "Summary"],
+    }),
   }),
 });
 
@@ -67,4 +76,5 @@ export const {
   useGetAlertsQuery,
   useGetGSTSummaryQuery,
   useUploadFileMutation,
+  useResetDataMutation,
 } = api;

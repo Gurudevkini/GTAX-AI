@@ -36,6 +36,17 @@ function parseFileBuffer(buffer) {
   return { sheetName, rowCount: rows.length, rows };
 }
 
+// ── POST /upload/reset — wipe all in-memory data ──────────────────────────────
+router.post("/reset", (_req, res) => {
+  try {
+    setInvoices([]);
+    setGstr2b([]);
+    res.status(200).json({ success: true, message: "Data cleared successfully" });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // ── POST /upload/invoices  |  POST /upload/gstr2b ─────────────────────────────
 //
 // Using the callback form of upload.single() so multer errors (wrong MIME,

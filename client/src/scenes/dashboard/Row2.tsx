@@ -16,8 +16,10 @@ import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 
 const AlertIcon = ({ severity }: { severity: string }) => {
-  if (severity === "High") return <ErrorOutlineIcon sx={{ fontSize: "14px", color: "#ff5252", mt: "1px" }} />;
-  if (severity === "Medium") return <WarningAmberIcon sx={{ fontSize: "14px", color: "#f2b455", mt: "1px" }} />;
+  if (severity === "High")
+    return <ErrorOutlineIcon sx={{ fontSize: "14px", color: "#ff5252", mt: "1px" }} />;
+  if (severity === "Medium")
+    return <WarningAmberIcon sx={{ fontSize: "14px", color: "#f2b455", mt: "1px" }} />;
   return <InfoOutlinedIcon sx={{ fontSize: "14px", color: "#8884d8", mt: "1px" }} />;
 };
 
@@ -78,53 +80,91 @@ const Row2 = () => {
         </Box>
       </DashboardBox>
 
-      {/* Box E — Invoice status donut */}
-      <DashboardBox gridArea="e">
-        <BoxHeader title="Invoice Status Mix" subtitle="current period breakdown" sideText="" />
-        <FlexBetween mt="0.25rem" gap="1.5rem" pr="1rem">
-          <PieChart width={130} height={110} margin={{ top: 0, right: -10, left: 10, bottom: 0 }}>
-            <Pie
-              stroke="none"
-              data={pieData}
-              innerRadius={28}
-              outerRadius={50}
-              paddingAngle={3}
-              dataKey="value"
-            >
-              {pieData.map((_, index) => (
-                <Cell key={`cell-${index}`} fill={pieColors[index]} />
-              ))}
-            </Pie>
-            <Tooltip
-              contentStyle={{ background: palette.background.light, border: "none", fontSize: "11px" }}
-            />
-          </PieChart>
-          <Box flexBasis="60%">
+      {/* Box E — Invoice status mix (FIXED) */}
+      <DashboardBox gridArea="e" sx={{ overflow: "hidden" }}>
+        <BoxHeader
+          title="Invoice Status Mix"
+          subtitle="current period breakdown"
+          sideText=""
+        />
+
+        <Box
+          display="flex"
+          flexDirection="column"
+          alignItems="center"
+          justifyContent="center"
+          height="100%"
+          p="0.5rem 1rem 1rem 1rem"
+        >
+          {/* Chart */}
+          <Box width="100%" height="110px">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  stroke="none"
+                  data={pieData}
+                  innerRadius={20}
+                  outerRadius={30}
+                  paddingAngle={2}
+                  dataKey="value"
+                >
+                  {pieData.map((_, index) => (
+                    <Cell key={`cell-${index}`} fill={pieColors[index]} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  contentStyle={{
+                    background: palette.background.light,
+                    border: "none",
+                    fontSize: "11px",
+                  }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </Box>
+
+          {/* Legend */}
+          <Box width="100%" mt="0.5rem">
             {pieData.map((item, i) => (
-              <FlexBetween key={item.name} mb="0.3rem">
+              <FlexBetween key={item.name} mb="0.25rem">
                 <FlexBetween gap="0.4rem">
-                  <Box sx={{ width: 8, height: 8, borderRadius: "2px", background: pieColors[i] }} />
-                  <Typography variant="h6" fontSize="11px">{item.name}</Typography>
+                  <Box
+                    sx={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: "2px",
+                      background: pieColors[i],
+                    }}
+                  />
+                  <Typography fontSize="11px">{item.name}</Typography>
                 </FlexBetween>
-                <Typography variant="h6" fontSize="11px" color={pieColors[i]} fontWeight={600}>
+                <Typography fontSize="11px" color={pieColors[i]} fontWeight={600}>
                   {item.value}
                 </Typography>
               </FlexBetween>
             ))}
-            <Box mt="0.6rem" pt="0.5rem" sx={{ borderTop: `1px solid ${palette.grey[800]}` }}>
-              <Typography variant="h6" fontSize="10px">
-                ITC Claimable: <span style={{ color: palette.primary[400], fontWeight: 600 }}>
+
+            <Box
+              mt="0.5rem"
+              pt="0.4rem"
+              sx={{ borderTop: `1px solid ${palette.grey[800]}` }}
+            >
+              <Typography fontSize="10px">
+                ITC Claimable:{" "}
+                <span style={{ color: palette.primary[400], fontWeight: 600 }}>
                   ₹{((summary?.totalITC ?? 0) / 100000).toFixed(1)}L
                 </span>
               </Typography>
-              <Typography variant="h6" fontSize="10px" mt="0.2rem">
-                ITC at Risk: <span style={{ color: "#ff5252", fontWeight: 600 }}>
+
+              <Typography fontSize="10px" mt="0.2rem">
+                ITC at Risk:{" "}
+                <span style={{ color: "#ff5252", fontWeight: 600 }}>
                   ₹{((summary?.itcAtRisk ?? 0) / 100000).toFixed(1)}L
                 </span>
               </Typography>
             </Box>
           </Box>
-        </FlexBetween>
+        </Box>
       </DashboardBox>
 
       {/* Box F — Alerts panel */}
@@ -146,8 +186,11 @@ const Row2 = () => {
                 background: palette.background.default,
                 borderRadius: "8px",
                 borderLeft: `3px solid ${
-                  alert.severity === "High" ? "#ff5252" :
-                  alert.severity === "Medium" ? "#f2b455" : "#8884d8"
+                  alert.severity === "High"
+                    ? "#ff5252"
+                    : alert.severity === "Medium"
+                    ? "#f2b455"
+                    : "#8884d8"
                 }`,
               }}
             >
