@@ -3,11 +3,20 @@ import { Link, useNavigate } from "react-router-dom";
 import { Box, Typography, useTheme } from "@mui/material";
 import FlexBetween from "@/components/FlexBetween";
 import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
+import { useGetGSTSummaryQuery } from "@/state/api";
+import { MOCK_SUMMARY } from "@/state/mockData";
 
 const Navbar = () => {
   const { palette } = useTheme();
   const navigate = useNavigate();
   const [selected, setSelected] = useState("dashboard");
+
+  const { data: rawSummary } = useGetGSTSummaryQuery();
+  const summary = (rawSummary && rawSummary.totalInvoices > 0) ? rawSummary : MOCK_SUMMARY;
+  const healthScore = summary.healthScore;
+  const healthColor = healthScore >= 75 ? "#12efe8" : healthScore >= 50 ? "#f2b455" : "#ff5252";
+  const healthBg    = healthScore >= 75 ? "rgba(18,239,200,0.08)" : healthScore >= 50 ? "rgba(242,180,85,0.08)" : "rgba(255,82,82,0.08)";
+  const healthBorder = healthScore >= 75 ? "rgba(18,239,200,0.25)" : healthScore >= 50 ? "rgba(242,180,85,0.25)" : "rgba(255,82,82,0.25)";
 
   const handleLogout = () => {
     localStorage.removeItem("gtax_token");
@@ -74,8 +83,8 @@ const Navbar = () => {
         <FlexBetween
           gap="0.5rem"
           sx={{
-            background: "rgba(18,239,200,0.08)",
-            border: "1px solid rgba(18,239,200,0.2)",
+            background: healthBg,
+            border: `1px solid ${healthBorder}`,
             borderRadius: "20px",
             padding: "4px 14px",
           }}
@@ -85,7 +94,7 @@ const Navbar = () => {
               width: 7,
               height: 7,
               borderRadius: "50%",
-              background: palette.primary[500],
+              background: healthColor,
               animation: "pulse 2s infinite",
               "@keyframes pulse": {
                 "0%, 100%": { opacity: 1 },
@@ -93,10 +102,47 @@ const Navbar = () => {
               },
             }}
           />
-          <Typography fontSize="11px" fontWeight={600} color={palette.primary[400]}>
-            Health Score: 72 / 100
+          <Typography fontSize="11px" fontWeight={600} color={healthColor}>
+            Health Score: {healthScore} / 100
           </Typography>
         </FlexBetween>
+
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            gap: "0.5rem",
+            cursor: "pointer",
+          }}
+          onClick={() => {
+            navigate("/profile");
+            setSelected("profile");
+          }}
+        >
+          <Box
+            sx={{
+              width: 32,
+              height: 32,
+              borderRadius: "50%",
+              background: palette.primary[700],
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              overflow: "hidden",
+              border: `2px solid ${selected === "profile" ? palette.primary[400] : "transparent"}`,
+            }}
+          >
+            {localStorage.getItem("gtax_user") ? (
+              <img
+                src={JSON.parse(localStorage.getItem("gtax_user") || "{}")?.profileImage || `https://ui-avatars.com/api/?name=${JSON.parse(localStorage.getItem("gtax_user") || "{}")?.firstName || "User"}&background=random`}
+                alt="Profile"
+                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+              />
+            ) : (
+              <Typography fontSize="14px" fontWeight={600} color="#fff">U</Typography>
+            )}
+          </Box>
+        </Box>
 
         <Box
           onClick={handleLogout}

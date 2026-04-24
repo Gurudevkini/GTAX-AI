@@ -1,7 +1,9 @@
 import BoxHeader from "@/components/BoxHeader";
 import DashboardBox from "@/components/DashboardBox";
 import FlexBetween from "@/components/FlexBetween";
+import PremiumLock, { PlanType } from "@/components/PremiumLock";
 import { useGetGSTSummaryQuery, useGetAlertsQuery, useGetInvoicesQuery } from "@/state/api";
+import { MOCK_SUMMARY, MOCK_ALERTS, MOCK_INVOICES } from "@/state/mockData";
 import { Box, Typography, useTheme, Button, CircularProgress } from "@mui/material";
 import { useMemo, useState } from "react";
 import {
@@ -15,6 +17,11 @@ import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
+
+interface Row2Props {
+  currentPlan: PlanType;
+  onUpgraded: (plan: string) => void;
+}
 
 const AlertIcon = ({ severity }: { severity: string }) => {
   if (severity === "High")
@@ -255,11 +262,15 @@ const exportAlertsPDF = async (
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-const Row2 = () => {
+const Row2 = ({ currentPlan, onUpgraded }: Row2Props) => {
   const { palette } = useTheme();
-  const { data: summary } = useGetGSTSummaryQuery();
-  const { data: alertsData } = useGetAlertsQuery();
-  const { data: invoices } = useGetInvoicesQuery();
+  const { data: rawSummary } = useGetGSTSummaryQuery();
+  const { data: rawAlerts } = useGetAlertsQuery();
+  const { data: rawInvoices } = useGetInvoicesQuery();
+
+  const summary = rawSummary || null;
+  const alerts = rawAlerts || [];
+  const invoices = rawInvoices || [];
 
   const [exporting, setExporting] = useState(false);
 
@@ -275,8 +286,8 @@ const Row2 = () => {
   const pieColors = [palette.primary[500], "#ff5252", "#8884d8"];
 
   const openAlerts = useMemo(
-    () => alertsData?.filter((a) => a.status === "open").slice(0, 5) ?? [],
-    [alertsData]
+    () => alerts?.filter((a: any) => a.status === "open").slice(0, 5) ?? [],
+    [alerts]
   );
 
   const handleExportPDF = async () => {
@@ -324,89 +335,83 @@ const Row2 = () => {
         </Box>
       </DashboardBox>
 
-      {/* Box E — Invoice status mix */}
+      {/* Box E — Invoice status mix — Business+ */}
       <DashboardBox gridArea="e" sx={{ overflow: "hidden" }}>
-        <BoxHeader
-          title="Invoice Status Mix"
-          subtitle="current period breakdown"
-          sideText=""
-        />
-
-        <Box
-          display="flex"
-          flexDirection="column"
-          alignItems="center"
-          justifyContent="center"
-          height="100%"
-          p="0.5rem 1rem 1rem 1rem"
+        <PremiumLock
+          requiredPlan="business"
+          currentPlan={currentPlan}
+          badge="Business Plan"
+          label="Invoice Status Breakdown"
+          onUpgraded={onUpgraded}
         >
-          <Box width="100%" height="110px">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  stroke="none"
-                  data={pieData}
-                  innerRadius={20}
-                  outerRadius={30}
-                  paddingAngle={2}
-                  dataKey="value"
-                >
-                  {pieData.map((_, index) => (
-                    <Cell key={`cell-${index}`} fill={pieColors[index]} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  contentStyle={{
-                    background: palette.background.light,
-                    border: "none",
-                    fontSize: "11px",
-                  }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-          </Box>
+          <Box
+            display="flex"
+            flexDirection="row"
+            alignItems="stretch"
+            justifyContent="space-between"
+            width="100%"
+            height="100%"
+            p="1rem"
+          >
+            {/* Left Side — Header & Legend */}
+            <Box width="50%" display="flex" flexDirection="column" justifyContent="space-between">
+              <BoxHeader
+                title="Invoice Status Mix"
+                subtitle="current period breakdown"
+                sideText=""
+              />
+              <Box display="flex" flexDirection="column" gap="0.5rem" mt="1rem">
+                {pieData.map((item, i) => (
+                  <FlexBetween key={item.name}>
+                    <Box display="flex" alignItems="center" gap="0.5rem">
+                      <Box
+                        sx={{
+                          width: 12,
+                          height: 12,
+                          borderRadius: "4px",
+                          background: pieColors[i],
+                        }}
+                      />
+                      <Typography fontSize="12px" color={palette.grey[300]}>
+                        {item.name}
+                      </Typography>
+                    </Box>
+                    <Typography fontSize="13px" color={pieColors[i]} fontWeight={700}>
+                      {item.value}
+                    </Typography>
+                  </FlexBetween>
+                ))}
+              </Box>
+            </Box>
 
-          <Box width="100%" mt="0.5rem">
-            {pieData.map((item, i) => (
-              <FlexBetween key={item.name} mb="0.25rem">
-                <FlexBetween gap="0.4rem">
-                  <Box
-                    sx={{
-                      width: 8,
-                      height: 8,
-                      borderRadius: "2px",
-                      background: pieColors[i],
+            {/* Right Side — Pie Chart */}
+            <Box width="50%" height="100%" display="flex" justifyContent="center" alignItems="center" position="relative">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    stroke="none"
+                    data={pieData}
+                    innerRadius={36}
+                    outerRadius={56}
+                    dataKey="value"
+                  >
+                    {pieData.map((_, index) => (
+                      <Cell key={`cell-${index}`} fill={pieColors[index]} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{
+                      background: palette.background.paper,
+                      border: "none",
+                      fontSize: "11px",
+                      borderRadius: "8px"
                     }}
                   />
-                  <Typography fontSize="11px">{item.name}</Typography>
-                </FlexBetween>
-                <Typography fontSize="11px" color={pieColors[i]} fontWeight={600}>
-                  {item.value}
-                </Typography>
-              </FlexBetween>
-            ))}
-
-            <Box
-              mt="0.5rem"
-              pt="0.4rem"
-              sx={{ borderTop: `1px solid ${palette.grey[800]}` }}
-            >
-              <Typography fontSize="10px">
-                ITC Claimable:{" "}
-                <span style={{ color: palette.primary[400], fontWeight: 600 }}>
-                  ₹{((summary?.totalITC ?? 0) / 100000).toFixed(1)}L
-                </span>
-              </Typography>
-
-              <Typography fontSize="10px" mt="0.2rem">
-                ITC at Risk:{" "}
-                <span style={{ color: "#ff5252", fontWeight: 600 }}>
-                  ₹{((summary?.itcAtRisk ?? 0) / 100000).toFixed(1)}L
-                </span>
-              </Typography>
+                </PieChart>
+              </ResponsiveContainer>
             </Box>
           </Box>
-        </Box>
+        </PremiumLock>
       </DashboardBox>
 
       {/* Box F — Alerts panel */}
@@ -425,13 +430,16 @@ const Row2 = () => {
             sideText={`${openAlerts.length} open`}
           />
 
+          {/* Export PDF — Business+ feature */}
           <Button
             size="small"
             variant="outlined"
-            disabled={exporting || openAlerts.length === 0}
-            onClick={handleExportPDF}
+            disabled={exporting || openAlerts.length === 0 || currentPlan === "free"}
+            onClick={currentPlan === "free" ? () => {} : handleExportPDF}
             startIcon={
-              exporting ? (
+              currentPlan === "free" ? (
+                <span style={{ fontSize: "13px" }}>🔒</span>
+              ) : exporting ? (
                 <CircularProgress size={11} color="inherit" />
               ) : (
                 <PictureAsPdfIcon sx={{ fontSize: "13px" }} />
@@ -445,12 +453,12 @@ const Row2 = () => {
               px: "12px",
               py: "4px",
               whiteSpace: "nowrap",
-              borderColor: "rgba(255,82,82,0.4)",
-              color: "#ff7070",
+              borderColor: currentPlan === "free" ? "rgba(255,255,255,0.1)" : "rgba(255,82,82,0.4)",
+              color: currentPlan === "free" ? "rgba(255,255,255,0.25)" : "#ff7070",
               letterSpacing: "0.3px",
               "&:hover": {
-                borderColor: "#ff5252",
-                background: "rgba(255,82,82,0.08)",
+                borderColor: currentPlan === "free" ? "rgba(255,255,255,0.1)" : "#ff5252",
+                background: currentPlan === "free" ? "transparent" : "rgba(255,82,82,0.08)",
               },
               "&:disabled": {
                 borderColor: "rgba(255,255,255,0.1)",
@@ -458,7 +466,7 @@ const Row2 = () => {
               },
             }}
           >
-            {exporting ? "Exporting…" : "Export PDF"}
+            {currentPlan === "free" ? "Export PDF (Business+)" : exporting ? "Exporting…" : "Export PDF"}
           </Button>
         </Box>
 

@@ -10,6 +10,9 @@ export interface AuthUser {
   lastName: string;
   email: string;
   gstin: string;
+  planType?: "free" | "plus" | "pro" | "business";
+  profileImage?: string;
+  usageCount?: number;
 }
 
 export const api = createApi({
@@ -57,13 +60,24 @@ export const api = createApi({
       { success: boolean; token: string; user: AuthUser },
       { email: string; password: string }
     >({
-      query: (body) => ({ url: "auth/login", method: "POST", body }),
+      query: (body: any) => ({ url: "auth/login", method: "POST", body }),
     }),
     register: build.mutation<
       { success: boolean; token: string; user: AuthUser },
       { firstName: string; lastName: string; email: string; gstin?: string; password: string }
     >({
-      query: (body) => ({ url: "auth/register", method: "POST", body }),
+      query: (body: any) => ({ url: "auth/register", method: "POST", body }),
+    }),
+    updateUser: build.mutation<
+      { success: boolean; user: AuthUser },
+      { planType?: string; profileImage?: string; usageCount?: number }
+    >({
+      query: (body: any) => ({
+        url: "auth/update",
+        method: "POST",
+        body,
+        headers: { Authorization: `Bearer ${localStorage.getItem("gtax_token") || ""}` },
+      }),
     }),
   }),
 });
@@ -77,4 +91,5 @@ export const {
   useResetDataMutation,
   useLoginMutation,
   useRegisterMutation,
+  useUpdateUserMutation,
 } = api;

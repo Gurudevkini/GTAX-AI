@@ -20,7 +20,9 @@ import {
 
 const Row1 = () => {
   const { palette } = useTheme();
-  const { data } = useGetGSTSummaryQuery();
+  const { data: rawData } = useGetGSTSummaryQuery();
+  // Strictly rely on server data if uploaded
+  const data = rawData || null;
 
   const reconciliationData = useMemo(() => {
     return data?.monthlyReconciliation ?? [];

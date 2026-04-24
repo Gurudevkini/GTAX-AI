@@ -25,6 +25,9 @@ router.post("/register", async (req, res) => {
       lastName: lastName || "",
       email: email.toLowerCase(),
       gstin: gstin || "",
+      planType: "free",
+      profileImage: "",
+      usageCount: 0,
       password: hashed,
       createdAt: new Date().toISOString(),
     };
@@ -42,6 +45,65 @@ router.post("/register", async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 });
+
+// POST /auth/update
+router.post("/update", (req, res) => {
+  try {
+    const header = req.headers.authorization || "";
+    const token = header.startsWith("Bearer ") ? header.slice(7) : null;
+
+    // If no token, still allow in demo mode — just return updated fields
+    let baseUser = {
+      _id: "demo_user",
+      firstName: "Demo",
+      lastName: "User",
+      email: "demo@gtax.ai",
+      gstin: "",
+      planType: "free",
+      profileImage: "",
+      usageCount: 0,
+      hasCompletedOnboarding: false,
+    };
+
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || "gtax_secret_dev");
+        // Try to find in memory store first
+        const found = users.find((u) => u._id === decoded.userId);
+        if (found) {
+          baseUser = { ...found };
+        } else {
+          // Reconstruct from JWT payload (demo/mock mode)
+          baseUser._id = decoded.userId || baseUser._id;
+          baseUser.email = decoded.email || baseUser.email;
+        }
+      } catch (_) {
+        // Invalid token — still proceed in demo mode
+      }
+    }
+
+    // Apply updates
+    const updated = {
+      ...baseUser,
+      planType: req.body.planType ?? baseUser.planType,
+      profileImage: req.body.profileImage !== undefined ? req.body.profileImage : baseUser.profileImage,
+      usageCount: req.body.usageCount !== undefined ? req.body.usageCount : baseUser.usageCount,
+      hasCompletedOnboarding: req.body.hasCompletedOnboarding !== undefined ? req.body.hasCompletedOnboarding : baseUser.hasCompletedOnboarding,
+    };
+
+    // Persist in memory if user exists
+    const idx = users.findIndex((u) => u._id === updated._id);
+    if (idx !== -1) {
+      users[idx] = { ...users[idx], ...updated };
+    }
+
+    const { password: _, ...safeUser } = updated;
+    res.json({ success: true, user: safeUser });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Failed to update user: " + err.message });
+  }
+});
+
 
 // POST /auth/login
 router.post("/login", async (req, res) => {

@@ -2,16 +2,26 @@ import BoxHeader from "@/components/BoxHeader";
 import DashboardBox from "@/components/DashboardBox";
 import FlexBetween from "@/components/FlexBetween";
 import StatusChip from "@/components/StatusChip";
+import PremiumLock, { PlanType } from "@/components/PremiumLock";
 import { useGetInvoicesQuery, useGetVendorsQuery, useGetGSTSummaryQuery } from "@/state/api";
 import { Box, Typography, useTheme } from "@mui/material";
 import { DataGrid, GridCellParams } from "@mui/x-data-grid";
 import { useMemo } from "react";
 
-const Row3 = () => {
+interface Row3Props {
+  currentPlan: PlanType;
+  onUpgraded: (plan: string) => void;
+}
+
+const Row3 = ({ currentPlan, onUpgraded }: Row3Props) => {
   const { palette } = useTheme();
-  const { data: invoices } = useGetInvoicesQuery();
-  const { data: vendors } = useGetVendorsQuery();
-  const { data: summary } = useGetGSTSummaryQuery();
+  const { data: rawInvoices } = useGetInvoicesQuery();
+  const { data: rawVendors } = useGetVendorsQuery();
+  const { data: rawSummary } = useGetGSTSummaryQuery();
+
+  const invoices = rawInvoices || [];
+  const vendors  = rawVendors || [];
+  const summary  = rawSummary || null;
 
   const dataGridStyles = {
     "& .MuiDataGrid-root": { color: palette.grey[300], border: "none" },
@@ -69,102 +79,110 @@ const Row3 = () => {
 
   return (
     <>
-      {/* Box G — Invoice DataGrid */}
+      {/* Box G — Invoice DataGrid — CA+ */}
       <DashboardBox gridArea="g">
-        <BoxHeader
-          title="Invoice Ledger"
-          subtitle="recent invoices with reconciliation status"
-          sideText={`${invoices?.length ?? 0} total`}
-        />
-        <Box mt="0.5rem" p="0 0.5rem" height="75%" sx={dataGridStyles}>
-          <DataGrid
-            columnHeaderHeight={25}
-            rowHeight={35}
-            hideFooter
-            rows={invoices ?? []}
-            columns={invoiceColumns}
-            getRowId={(row) => row._id}
+        <PremiumLock requiredPlan="ca" currentPlan={currentPlan} badge="CA Plan" label="Invoice Ledger" onUpgraded={onUpgraded}>
+          <BoxHeader
+            title="Invoice Ledger"
+            subtitle="recent invoices with reconciliation status"
+            sideText={`${invoices?.length ?? 0} total`}
           />
-        </Box>
+          <Box mt="0.5rem" p="0 0.5rem" height="75%" sx={dataGridStyles}>
+            <DataGrid
+              columnHeaderHeight={25}
+              rowHeight={35}
+              hideFooter
+              rows={invoices ?? []}
+              columns={invoiceColumns}
+              getRowId={(row) => row._id}
+            />
+          </Box>
+        </PremiumLock>
       </DashboardBox>
 
-      {/* Box H — Vendor Risk DataGrid */}
+      {/* Box H — Vendor Risk DataGrid — CA+ */}
       <DashboardBox gridArea="h">
-        <BoxHeader
-          title="Vendor Risk Board"
-          subtitle="compliance scores & risk levels"
-          sideText={`${vendors?.filter((v) => v.riskLevel === "High").length ?? 0} high risk`}
-        />
-        <Box mt="0.5rem" p="0 0.5rem" height="80%" sx={dataGridStyles}>
-          <DataGrid
-            columnHeaderHeight={25}
-            rowHeight={35}
-            hideFooter
-            rows={vendors ?? []}
-            columns={vendorColumns}
-            getRowId={(row) => row._id}
+        <PremiumLock requiredPlan="ca" currentPlan={currentPlan} badge="CA Plan" label="Vendor Risk Board" onUpgraded={onUpgraded}>
+          <BoxHeader
+            title="Vendor Risk Board"
+            subtitle="compliance scores & risk levels"
+            sideText={`${vendors?.filter((v) => v.riskLevel === "High").length ?? 0} high risk`}
           />
-        </Box>
+          <Box mt="0.5rem" p="0 0.5rem" height="80%" sx={dataGridStyles}>
+            <DataGrid
+              columnHeaderHeight={25}
+              rowHeight={35}
+              hideFooter
+              rows={vendors ?? []}
+              columns={vendorColumns}
+              getRowId={(row) => row._id}
+            />
+          </Box>
+        </PremiumLock>
       </DashboardBox>
 
-      {/* Box I — ITC Summary */}
+      {/* Box I — ITC Summary — CA+ */}
       <DashboardBox gridArea="i">
-        <BoxHeader title="ITC Summary" subtitle="input tax credit position" sideText="" />
-        <FlexBetween mt="0.5rem" gap="0.5rem" p="0 1rem" flexDirection="column" alignItems="stretch">
-          {[
-            { label: "Total ITC Available", value: `₹${((summary?.totalITC ?? 0) / 100000).toFixed(2)}L`, color: palette.primary[400] },
-            { label: "ITC at Risk", value: `₹${((summary?.itcAtRisk ?? 0) / 100000).toFixed(2)}L`, color: "#ff5252" },
-            { label: "GST Payable", value: `₹${((summary?.gstPayable ?? 0) / 100000).toFixed(2)}L`, color: palette.secondary[400] },
-          ].map((item) => (
-            <FlexBetween key={item.label} p="8px 0" sx={{ borderBottom: `1px solid ${palette.grey[800]}` }}>
-              <Typography variant="h6" fontSize="11px">{item.label}</Typography>
-              <Typography sx={{ fontSize: "14px", fontWeight: 700, color: item.color, fontFamily: "IBM Plex Mono, monospace" }}>
-                {item.value}
+        <PremiumLock requiredPlan="ca" currentPlan={currentPlan} badge="CA Plan" label="ITC Summary" onUpgraded={onUpgraded}>
+          <BoxHeader title="ITC Summary" subtitle="input tax credit position" sideText="" />
+          <Box mt="0.2rem" p="0 1rem" display="flex" flexDirection="column" gap="0.3rem">
+            {[
+              { label: "Total ITC Available", value: `₹${((summary?.totalITC ?? 0) / 100000).toFixed(2)}L`, color: palette.primary[400] },
+              { label: "ITC at Risk", value: `₹${((summary?.itcAtRisk ?? 0) / 100000).toFixed(2)}L`, color: "#ff5252" },
+              { label: "GST Payable", value: `₹${((summary?.gstPayable ?? 0) / 100000).toFixed(2)}L`, color: palette.secondary[400] },
+            ].map((item) => (
+              <FlexBetween key={item.label} pb="4px" sx={{ borderBottom: `1px solid ${palette.grey[800]}` }}>
+                <Typography variant="h6" fontSize="10px">{item.label}</Typography>
+                <Typography sx={{ fontSize: "12px", fontWeight: 700, color: item.color, fontFamily: "IBM Plex Mono, monospace" }}>
+                  {item.value}
+                </Typography>
+              </FlexBetween>
+            ))}
+            <Box mt="0.2rem">
+              <Typography variant="h6" fontSize="9px" mb="0.2rem">ITC Risk Percentage</Typography>
+              <Box sx={{ height: "6px", background: palette.grey[800], borderRadius: "3px", overflow: "hidden" }}>
+                <Box
+                  sx={{
+                    height: "100%",
+                    width: `${summary ? (summary.itcAtRisk / summary.totalITC) * 100 : 0}%`,
+                    background: `linear-gradient(90deg, #ff5252, #ff8a80)`,
+                    borderRadius: "3px",
+                  }}
+                />
+              </Box>
+              <Typography variant="h6" fontSize="9px" mt="0.2rem" color="#ff5252">
+                {summary ? ((summary.itcAtRisk / summary.totalITC) * 100).toFixed(1) : 0}% of ITC at risk
               </Typography>
-            </FlexBetween>
-          ))}
-          <Box mt="0.5rem">
-            <Typography variant="h6" fontSize="10px" mb="0.3rem">ITC Risk Percentage</Typography>
-            <Box sx={{ height: "8px", background: palette.grey[800], borderRadius: "4px", overflow: "hidden" }}>
-              <Box
-                sx={{
-                  height: "100%",
-                  width: `${summary ? (summary.itcAtRisk / summary.totalITC) * 100 : 0}%`,
-                  background: `linear-gradient(90deg, #ff5252, #ff8a80)`,
-                  borderRadius: "4px",
-                }}
-              />
             </Box>
-            <Typography variant="h6" fontSize="10px" mt="0.2rem" color="#ff5252">
-              {summary ? ((summary.itcAtRisk / summary.totalITC) * 100).toFixed(1) : 0}% of ITC at risk
-            </Typography>
           </Box>
-        </FlexBetween>
+        </PremiumLock>
       </DashboardBox>
 
-      {/* Box J — Health Score */}
+      {/* Box J — Health Score — CA+ */}
       <DashboardBox gridArea="j">
-        <BoxHeader title="GST Health Score" subtitle="overall compliance rating" sideText="" />
-        <FlexBetween p="0.5rem 1.5rem" gap="1rem">
-          <Box textAlign="center">
-            <Typography sx={{ fontSize: "48px", fontWeight: 800, color: healthColor, fontFamily: "IBM Plex Mono, monospace", lineHeight: 1 }}>
-              {healthScore}
-            </Typography>
-            <Typography variant="h6" fontSize="10px" mt="0.3rem">out of 100</Typography>
-          </Box>
-          <Box flex={1}>
-            <Box sx={{ height: "10px", background: palette.grey[800], borderRadius: "5px", overflow: "hidden", mb: "0.4rem" }}>
-              <Box sx={{ height: "100%", width: `${healthScore}%`, background: healthColor, borderRadius: "5px", transition: "width 0.6s ease" }} />
+        <PremiumLock requiredPlan="ca" currentPlan={currentPlan} badge="CA Plan" label="GST Health Score" onUpgraded={onUpgraded}>
+          <BoxHeader title="GST Health Score" subtitle="overall compliance rating" sideText="" />
+          <FlexBetween p="0.5rem 1.5rem" gap="1rem">
+            <Box textAlign="center">
+              <Typography sx={{ fontSize: "48px", fontWeight: 800, color: healthColor, fontFamily: "IBM Plex Mono, monospace", lineHeight: 1 }}>
+                {healthScore}
+              </Typography>
+              <Typography variant="h6" fontSize="10px" mt="0.3rem">out of 100</Typography>
             </Box>
-            <Typography variant="h6" fontSize="10px">
-              {healthScore >= 75
-                ? "Compliance is strong. Keep up reconciliation frequency."
-                : healthScore >= 50
-                ? "Moderate risk. Resolve mismatches to improve ITC claims."
-                : "High risk. Multiple vendors and invoices need urgent attention."}
-            </Typography>
-          </Box>
-        </FlexBetween>
+            <Box flex={1}>
+              <Box sx={{ height: "10px", background: palette.grey[800], borderRadius: "5px", overflow: "hidden", mb: "0.4rem" }}>
+                <Box sx={{ height: "100%", width: `${healthScore}%`, background: healthColor, borderRadius: "5px", transition: "width 0.6s ease" }} />
+              </Box>
+              <Typography variant="h6" fontSize="10px">
+                {healthScore >= 75
+                  ? "Compliance is strong. Keep up reconciliation frequency."
+                  : healthScore >= 50
+                  ? "Moderate risk. Resolve mismatches to improve ITC claims."
+                  : "High risk. Multiple vendors and invoices need urgent attention."}
+              </Typography>
+            </Box>
+          </FlexBetween>
+        </PremiumLock>
       </DashboardBox>
     </>
   );

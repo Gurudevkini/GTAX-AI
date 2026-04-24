@@ -7,6 +7,7 @@ import {
   Collapse,
   Alert,
   AlertTitle,
+  useTheme,
 } from "@mui/material";
 import UploadFileIcon from "@mui/icons-material/UploadFile";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
@@ -14,7 +15,9 @@ import { useState, useEffect, type ChangeEvent } from "react";
 import Row1 from "./Row1";
 import Row2 from "./Row2";
 import Row3 from "./Row3";
-import { useUploadFileMutation, useResetDataMutation, useGetInvoicesQuery } from "@/state/api";
+import { useUploadFileMutation, useResetDataMutation, useGetInvoicesQuery, useUpdateUserMutation } from "@/state/api";
+import UpgradeModal from "@/components/UpgradeModal";
+import PremiumLock, { PlanType } from "@/components/PremiumLock";
 
 const gridTemplateLargeScreens = `
   "a b c"
@@ -59,9 +62,18 @@ const initState = (): UploadState => ({
 });
 
 const Dashboard = () => {
+  const { palette } = useTheme();
   const isAboveMediumScreens = useMediaQuery("(min-width: 900px)");
   const [uploadFile] = useUploadFileMutation();
   const [resetData, { isLoading: isResetting }] = useResetDataMutation();
+  const [updateUser] = useUpdateUserMutation();
+
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [currentPlan, setCurrentPlan] = useState<PlanType>(() => {
+    const u = JSON.parse(localStorage.getItem("gtax_user") || "{}");
+    return (u.planType as PlanType) || "free";
+  });
+  const user = JSON.parse(localStorage.getItem("gtax_user") || "{}");
 
   const [invoiceState, setInvoiceState] = useState<UploadState>(initState());
   const [gstr2bState, setGstr2bState] = useState<UploadState>(initState());
@@ -145,6 +157,12 @@ const Dashboard = () => {
       return;
     }
 
+    // FEATURE GATING LOGIC — Free tier: 1 upload/month
+    if (currentPlan === "free" && (user.usageCount || 0) >= 1) {
+      setIsModalOpen(true);
+      return;
+    }
+
     const setter = type === "invoices" ? setInvoiceState : setGstr2bState;
     setter({ status: "uploading", fileName: file.name, count: 0, error: "" });
     setBanner({ show: false, type: "success", title: "", body: "" });
@@ -178,6 +196,26 @@ const Dashboard = () => {
       });
     }
   };
+
+  const handleUpgrade = async (plan: string) => {
+    try {
+      // Try API but don't block on failure (demo/mock mode)
+      await updateUser({ planType: plan }).unwrap().catch(() => null);
+    } catch (_) {
+      // ignore
+    }
+    // Always update locally
+    const stored = JSON.parse(localStorage.getItem("gtax_user") || "{}");
+    stored.planType = plan;
+    localStorage.setItem("gtax_user", JSON.stringify(stored));
+    setCurrentPlan(plan as PlanType);
+    setIsModalOpen(false);
+    setBanner({
+      show: true, type: "success", title: "🎉 Plan Upgraded!",
+      body: `You are now on the ${plan.toUpperCase()} plan. All features are now unlocked!`
+    });
+  };
+
 
   const renderUploadButton = (
     type: "invoices" | "gstr2b",
@@ -258,6 +296,11 @@ const Dashboard = () => {
 
   return (
     <>
+      <UpgradeModal 
+        open={isModalOpen} onClose={() => setIsModalOpen(false)} 
+        onUpgrade={handleUpgrade} currentPlan={user.planType || "free"} 
+      />
+
       {/* ── Upload Panel ─────────────────────────────────────────────────── */}
       <Box
         sx={{
@@ -413,31 +456,70 @@ const Dashboard = () => {
         </Collapse>
       </Box>
 
-      {/* ── Dashboard Grid ───────────────────────────────────────────────── */}
-      <Box
-        m="1.5rem 2.5rem"
-        width="100%"
-        height="100%"
-        display="grid"
-        gap="1.5rem"
-        sx={
-          isAboveMediumScreens
-            ? {
-                gridTemplateColumns: "repeat(3, minmax(370px, 1fr))",
-                gridTemplateRows: "repeat(10, minmax(60px, 1fr))",
-                gridTemplateAreas: gridTemplateLargeScreens,
-              }
-            : {
-                gridAutoColumns: "1fr",
-                gridAutoRows: "80px",
-                gridTemplateAreas: gridTemplateSmallScreens,
-              }
-        }
-      >
-        <Row1 />
-        <Row2 />
-        <Row3 />
-      </Box>
+      {/* ── Conditional Dashboard Grid or Empty State ─────────────────────── */}
+      {!(invoiceState.status === "success" && gstr2bState.status === "success") ? (
+        <Box
+          m="1.5rem 2.5rem"
+          width="100%"
+          display="flex"
+          flexDirection="column"
+          alignItems="center"
+          justifyContent="center"
+          p="4rem"
+          sx={{
+            background: "rgba(255,255,255,0.02)",
+            border: `1px dashed ${palette.grey[800]}`,
+            borderRadius: "16px",
+            minHeight: "500px"
+          }}
+        >
+          <Box
+            sx={{
+              width: "80px",
+              height: "80px",
+              borderRadius: "50%",
+              background: `linear-gradient(135deg, rgba(18,239,200,0.1), rgba(18,239,200,0.05))`,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              mb: "1.5rem"
+            }}
+          >
+            <UploadFileIcon sx={{ fontSize: "40px", color: palette.grey[500] }} />
+          </Box>
+          <Typography variant="h3" color="white" fontWeight={700} mb="0.5rem">
+            No Reconciliation Data Available
+          </Typography>
+          <Typography color={palette.grey[400]} textAlign="center" maxWidth="400px">
+            Please upload both your <b>Invoices</b> and <b>GSTR-2B</b> files using the panel above to unlock the dashboard and generate AI reconciliation insights.
+          </Typography>
+        </Box>
+      ) : (
+        <Box
+          m="1.5rem 2.5rem"
+          width="100%"
+          height="100%"
+          display="grid"
+          gap="1.5rem"
+          sx={
+            isAboveMediumScreens
+              ? {
+                  gridTemplateColumns: "repeat(3, minmax(370px, 1fr))",
+                  gridTemplateRows: "repeat(10, minmax(60px, 1fr))",
+                  gridTemplateAreas: gridTemplateLargeScreens,
+                }
+              : {
+                  gridAutoColumns: "1fr",
+                  gridAutoRows: "80px",
+                  gridTemplateAreas: gridTemplateSmallScreens,
+                }
+          }
+        >
+          <Row1 />
+          <Row2 currentPlan={currentPlan} onUpgraded={(p) => setCurrentPlan(p as PlanType)} />
+          <Row3 currentPlan={currentPlan} onUpgraded={(p) => setCurrentPlan(p as PlanType)} />
+        </Box>
+      )}
     </>
   );
 };

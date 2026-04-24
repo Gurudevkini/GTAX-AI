@@ -27,9 +27,6 @@ export const getInvoices = () => store.invoices;
 export const getVendors  = () => store.vendors;
 export const getAlerts   = () => store.alerts;
 
-// ─── Seed data ────────────────────────────────────────────────────────────────
-store.invoices = [];
-
 // ─── Internal builders ────────────────────────────────────────────────────────
 
 function buildVendors(invList) {
@@ -133,9 +130,6 @@ function rebuildDerived() {
   store.vendors = buildVendors(store.invoices);
   store.alerts  = buildAlerts(store.invoices, store.vendors);
 }
-
-// Seed derived data on startup
-rebuildDerived();
 
 // ─── Summary ──────────────────────────────────────────────────────────────────
 export function getComputedSummary() {
@@ -246,3 +240,56 @@ export function setGstr2b(rows) {
     );
   }
 }
+
+// ─── Pre-load mock data so charts populate immediately on startup ──────────────
+store.gstr2b = [
+  { "Invoice Number": "INV-2023-001", "GSTIN": "27AADCT1234E1Z1", "Invoice Value": "50000",  "CGST": "3814",  "SGST": "3814",  "IGST": "0" },
+  { "Invoice Number": "INV-2023-002", "GSTIN": "22BBBB0000A1Z5",  "Invoice Value": "100000", "CGST": "0",     "SGST": "0",     "IGST": "15254" },
+  { "Invoice Number": "INV-2023-004", "GSTIN": "33EEEE3333A1Z4",  "Invoice Value": "78000",  "CGST": "6000",  "SGST": "6000",  "IGST": "0" },
+  { "Invoice Number": "INV-2023-005", "GSTIN": "09GGGG5555A1Z7",  "Invoice Value": "20000",  "CGST": "0",     "SGST": "0",     "IGST": "3051" },
+  { "Invoice Number": "INV-2023-006", "GSTIN": "27AADCT1234E1Z1", "Invoice Value": "60000",  "CGST": "4576",  "SGST": "4576",  "IGST": "0" },
+  { "Invoice Number": "INV-2023-007", "GSTIN": "24DDDD2222A1Z3",  "Invoice Value": "40000",  "CGST": "0",     "SGST": "0",     "IGST": "6102" },
+  { "Invoice Number": "INV-2023-009", "GSTIN": "14FFFF4444A1Z6",  "Invoice Value": "95000",  "CGST": "7500",  "SGST": "7500",  "IGST": "0" },
+  { "Invoice Number": "INV-2023-010", "GSTIN": "22BBBB0000A1Z5",  "Invoice Value": "70000",  "CGST": "0",     "SGST": "0",     "IGST": "10678" },
+  { "Invoice Number": "INV-2024-001", "GSTIN": "33EEEE3333A1Z4",  "Invoice Value": "36000",  "CGST": "2746",  "SGST": "2746",  "IGST": "0" },
+  { "Invoice Number": "INV-2024-002", "GSTIN": "27AADCT1234E1Z1", "Invoice Value": "85000",  "CGST": "6483",  "SGST": "6483",  "IGST": "0" },
+  { "Invoice Number": "INV-2024-003", "GSTIN": "09GGGG5555A1Z7",  "Invoice Value": "50000",  "CGST": "0",     "SGST": "0",     "IGST": "7627" },
+  { "Invoice Number": "INV-2024-005", "GSTIN": "14FFFF4444A1Z6",  "Invoice Value": "100000", "CGST": "0",     "SGST": "0",     "IGST": "15254" },
+  { "Invoice Number": "INV-2024-006", "GSTIN": "21CCCC1111A1Z2",  "Invoice Value": "40000",  "CGST": "3051",  "SGST": "3051",  "IGST": "0" },
+  { "Invoice Number": "INV-2024-007", "GSTIN": "22BBBB0000A1Z5",  "Invoice Value": "65000",  "CGST": "0",     "SGST": "0",     "IGST": "9915" },
+  { "Invoice Number": "INV-2024-008", "GSTIN": "27AADCT1234E1Z1", "Invoice Value": "52000",  "CGST": "4000",  "SGST": "4000",  "IGST": "0" },
+  { "Invoice Number": "INV-2024-009", "GSTIN": "33EEEE3333A1Z4",  "Invoice Value": "80000",  "CGST": "0",     "SGST": "0",     "IGST": "12203" },
+  { "Invoice Number": "INV-2024-010", "GSTIN": "09GGGG5555A1Z7",  "Invoice Value": "25000",  "CGST": "1907",  "SGST": "1907",  "IGST": "0" },
+  { "Invoice Number": "INV-2024-011", "GSTIN": "24DDDD2222A1Z3",  "Invoice Value": "70000",  "CGST": "5339",  "SGST": "5339",  "IGST": "0" },
+  { "Invoice Number": "INV-2024-012", "GSTIN": "14FFFF4444A1Z6",  "Invoice Value": "85000",  "CGST": "0",     "SGST": "0",     "IGST": "12966" },
+  { "Invoice Number": "INV-2024-013", "GSTIN": "27AADCT1234E1Z1", "Invoice Value": "40000",  "CGST": "3051",  "SGST": "3051",  "IGST": "0" },
+  { "Invoice Number": "INV-2024-015", "GSTIN": "22BBBB0000A1Z5",  "Invoice Value": "120000", "CGST": "9153",  "SGST": "9153",  "IGST": "0" },
+];
+
+setInvoices([
+  { "Invoice Number": "INV-2023-001", "Vendor Name": "TechNova Solutions", "GSTIN": "27AADCT1234E1Z1", "Date": "2023-11-03", "Taxable Amount": "42372",  "CGST": "3814", "SGST": "3814", "IGST": "0",     "Total Amount": "50000"  },
+  { "Invoice Number": "INV-2023-002", "Vendor Name": "Global Corp",         "GSTIN": "22BBBB0000A1Z5", "Date": "2023-11-08", "Taxable Amount": "84746",  "CGST": "0",    "SGST": "0",    "IGST": "15254", "Total Amount": "100000" },
+  { "Invoice Number": "INV-2023-003", "Vendor Name": "Apex Logistics",      "GSTIN": "21CCCC1111A1Z2", "Date": "2023-11-12", "Taxable Amount": "25000",  "CGST": "2250", "SGST": "2250", "IGST": "0",     "Total Amount": "29500"  },
+  { "Invoice Number": "INV-2023-004", "Vendor Name": "Prime Steels",        "GSTIN": "33EEEE3333A1Z4", "Date": "2023-11-18", "Taxable Amount": "63559",  "CGST": "5720", "SGST": "5720", "IGST": "0",     "Total Amount": "75000"  },
+  { "Invoice Number": "INV-2023-005", "Vendor Name": "Nexus Traders",       "GSTIN": "09GGGG5555A1Z7", "Date": "2023-11-22", "Taxable Amount": "16949",  "CGST": "0",    "SGST": "0",    "IGST": "3051",  "Total Amount": "20000"  },
+  { "Invoice Number": "INV-2023-006", "Vendor Name": "TechNova Solutions",  "GSTIN": "27AADCT1234E1Z1", "Date": "2023-12-04", "Taxable Amount": "50847",  "CGST": "4576", "SGST": "4576", "IGST": "0",     "Total Amount": "60000"  },
+  { "Invoice Number": "INV-2023-007", "Vendor Name": "Dynamic Dealers",     "GSTIN": "24DDDD2222A1Z3", "Date": "2023-12-10", "Taxable Amount": "33898",  "CGST": "0",    "SGST": "0",    "IGST": "6102",  "Total Amount": "40000"  },
+  { "Invoice Number": "INV-2023-008", "Vendor Name": "Apex Logistics",      "GSTIN": "21CCCC1111A1Z2", "Date": "2023-12-15", "Taxable Amount": "21186",  "CGST": "1907", "SGST": "1907", "IGST": "0",     "Total Amount": "25000"  },
+  { "Invoice Number": "INV-2023-009", "Vendor Name": "Rapid Delivery",      "GSTIN": "14FFFF4444A1Z6", "Date": "2023-12-20", "Taxable Amount": "76271",  "CGST": "6864", "SGST": "6864", "IGST": "0",     "Total Amount": "90000"  },
+  { "Invoice Number": "INV-2023-010", "Vendor Name": "Global Corp",         "GSTIN": "22BBBB0000A1Z5", "Date": "2023-12-28", "Taxable Amount": "59322",  "CGST": "0",    "SGST": "0",    "IGST": "10678", "Total Amount": "70000"  },
+  { "Invoice Number": "INV-2024-001", "Vendor Name": "Prime Steels",        "GSTIN": "33EEEE3333A1Z4", "Date": "2024-01-05", "Taxable Amount": "30508",  "CGST": "2746", "SGST": "2746", "IGST": "0",     "Total Amount": "36000"  },
+  { "Invoice Number": "INV-2024-002", "Vendor Name": "TechNova Solutions",  "GSTIN": "27AADCT1234E1Z1", "Date": "2024-01-10", "Taxable Amount": "72034",  "CGST": "6483", "SGST": "6483", "IGST": "0",     "Total Amount": "85000"  },
+  { "Invoice Number": "INV-2024-003", "Vendor Name": "Nexus Traders",       "GSTIN": "09GGGG5555A1Z7", "Date": "2024-01-14", "Taxable Amount": "42373",  "CGST": "0",    "SGST": "0",    "IGST": "7627",  "Total Amount": "50000"  },
+  { "Invoice Number": "INV-2024-004", "Vendor Name": "Dynamic Dealers",     "GSTIN": "24DDDD2222A1Z3", "Date": "2024-01-20", "Taxable Amount": "25424",  "CGST": "2288", "SGST": "2288", "IGST": "0",     "Total Amount": "30000"  },
+  { "Invoice Number": "INV-2024-005", "Vendor Name": "Rapid Delivery",      "GSTIN": "14FFFF4444A1Z6", "Date": "2024-01-25", "Taxable Amount": "84746",  "CGST": "0",    "SGST": "0",    "IGST": "15254", "Total Amount": "100000" },
+  { "Invoice Number": "INV-2024-006", "Vendor Name": "Apex Logistics",      "GSTIN": "21CCCC1111A1Z2", "Date": "2024-02-03", "Taxable Amount": "33898",  "CGST": "3051", "SGST": "3051", "IGST": "0",     "Total Amount": "40000"  },
+  { "Invoice Number": "INV-2024-007", "Vendor Name": "Global Corp",         "GSTIN": "22BBBB0000A1Z5", "Date": "2024-02-10", "Taxable Amount": "55085",  "CGST": "0",    "SGST": "0",    "IGST": "9915",  "Total Amount": "65000"  },
+  { "Invoice Number": "INV-2024-008", "Vendor Name": "TechNova Solutions",  "GSTIN": "27AADCT1234E1Z1", "Date": "2024-02-15", "Taxable Amount": "42373",  "CGST": "3814", "SGST": "3814", "IGST": "0",     "Total Amount": "50000"  },
+  { "Invoice Number": "INV-2024-009", "Vendor Name": "Prime Steels",        "GSTIN": "33EEEE3333A1Z4", "Date": "2024-02-22", "Taxable Amount": "67797",  "CGST": "0",    "SGST": "0",    "IGST": "12203", "Total Amount": "80000"  },
+  { "Invoice Number": "INV-2024-010", "Vendor Name": "Nexus Traders",       "GSTIN": "09GGGG5555A1Z7", "Date": "2024-02-28", "Taxable Amount": "21186",  "CGST": "1907", "SGST": "1907", "IGST": "0",     "Total Amount": "25000"  },
+  { "Invoice Number": "INV-2024-011", "Vendor Name": "Dynamic Dealers",     "GSTIN": "24DDDD2222A1Z3", "Date": "2024-03-06", "Taxable Amount": "59322",  "CGST": "5339", "SGST": "5339", "IGST": "0",     "Total Amount": "70000"  },
+  { "Invoice Number": "INV-2024-012", "Vendor Name": "Rapid Delivery",      "GSTIN": "14FFFF4444A1Z6", "Date": "2024-03-12", "Taxable Amount": "72034",  "CGST": "0",    "SGST": "0",    "IGST": "12966", "Total Amount": "85000"  },
+  { "Invoice Number": "INV-2024-013", "Vendor Name": "TechNova Solutions",  "GSTIN": "27AADCT1234E1Z1", "Date": "2024-03-18", "Taxable Amount": "33898",  "CGST": "3051", "SGST": "3051", "IGST": "0",     "Total Amount": "40000"  },
+  { "Invoice Number": "INV-2024-014", "Vendor Name": "Apex Logistics",      "GSTIN": "21CCCC1111A1Z2", "Date": "2024-03-25", "Taxable Amount": "16949",  "CGST": "0",    "SGST": "0",    "IGST": "3051",  "Total Amount": "20000"  },
+  { "Invoice Number": "INV-2024-015", "Vendor Name": "Global Corp",         "GSTIN": "22BBBB0000A1Z5", "Date": "2024-03-31", "Taxable Amount": "101695", "CGST": "9153", "SGST": "9153", "IGST": "0",     "Total Amount": "120000" },
+]);

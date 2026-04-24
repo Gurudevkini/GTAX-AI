@@ -10,9 +10,22 @@ body,
   background-color: #1a1d23;
 }
 
-::-webkit-scrollbar { width: 8px; }
-::-webkit-scrollbar-track { background: #1a1d23; }
-::-webkit-scrollbar-thumb { background: #48494e; border-radius: 4px; }
-::-webkit-scrollbar-track:hover { background: #22262f; }
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { 
+  background: rgba(255,255,255,0.15); 
+  border-radius: 10px; 
+}
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.3); }
 
-* { box-sizing: border-box; }
+* { 
+  box-sizing: border-box; 
+  scroll-behavior: smooth;
+}
+
+body {
+  background-image: radial-gradient(circle at 50% -20%, #173238 0%, #0d1219 70%, #080b0f 100%);
+  background-attachment: fixed;
+  color: #fff;
+}
+
