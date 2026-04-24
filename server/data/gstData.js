@@ -1,109 +1,261 @@
-export const invoices = [
-  { _id: "inv001", invoiceNumber: "INV-2024-0112", gstin: "29AABCA1234F1Z5", vendorName: "Apex Supplies Pvt Ltd", date: "2024-03-18", taxableAmount: 48500, cgst: 4365, sgst: 4365, igst: 0, totalAmount: 57230, status: "matched", confidenceScore: 97 },
-  { _id: "inv002", invoiceNumber: "INV-2024-0108", gstin: "24AADCN5678K1Z2", vendorName: "Nirma Industrial Co", date: "2024-03-15", taxableAmount: 32000, cgst: 0, sgst: 0, igst: 5760, totalAmount: 37760, status: "mismatch", confidenceScore: 43 },
-  { _id: "inv003", invoiceNumber: "INV-2024-0105", gstin: "27AAAPR4567L1Z8", vendorName: "Rajesh Traders", date: "2024-03-12", taxableAmount: 19200, cgst: 1728, sgst: 1728, igst: 0, totalAmount: 22656, status: "matched", confidenceScore: 91 },
-  { _id: "inv004", invoiceNumber: "INV-2024-0101", gstin: "36AABCS2345M1Z0", vendorName: "Sri Durga Enterprises", date: "2024-03-10", taxableAmount: 67800, cgst: 0, sgst: 0, igst: 12204, totalAmount: 80004, status: "mismatch", confidenceScore: 29 },
-  { _id: "inv005", invoiceNumber: "INV-2024-0098", gstin: "33AACCT7890N1Z4", vendorName: "TechParts India Ltd", date: "2024-03-08", taxableAmount: 11500, cgst: 1035, sgst: 1035, igst: 0, totalAmount: 13570, status: "pending", confidenceScore: 68 },
-  { _id: "inv006", invoiceNumber: "INV-2024-0095", gstin: "08AABCB3456P1Z7", vendorName: "Bharat Steel Works", date: "2024-03-05", taxableAmount: 92000, cgst: 0, sgst: 0, igst: 16560, totalAmount: 108560, status: "matched", confidenceScore: 99 },
-  { _id: "inv007", invoiceNumber: "INV-2024-0091", gstin: "29AACKD6789Q1Z1", vendorName: "Krishna Distributors", date: "2024-03-02", taxableAmount: 28400, cgst: 2556, sgst: 2556, igst: 0, totalAmount: 33512, status: "mismatch", confidenceScore: 38 },
-  { _id: "inv008", invoiceNumber: "INV-2024-0088", gstin: "06AACCP8901R1Z3", vendorName: "Pioneer Components", date: "2024-02-28", taxableAmount: 54200, cgst: 4878, sgst: 4878, igst: 0, totalAmount: 63956, status: "matched", confidenceScore: 94 },
-  { _id: "inv009", invoiceNumber: "INV-2024-0084", gstin: "29AAACS9012S1Z6", vendorName: "Sunrise Metals Pvt", date: "2024-02-25", taxableAmount: 38700, cgst: 0, sgst: 0, igst: 6966, totalAmount: 45666, status: "pending", confidenceScore: 72 },
-  { _id: "inv010", invoiceNumber: "INV-2024-0081", gstin: "19AABCM0123T1Z9", vendorName: "Metro Fasteners Ltd", date: "2024-02-22", taxableAmount: 16900, cgst: 1521, sgst: 1521, igst: 0, totalAmount: 19942, status: "matched", confidenceScore: 88 },
-  { _id: "inv011", invoiceNumber: "INV-2024-0077", gstin: "27AADCR1234U1Z2", vendorName: "Royal Chemicals Co", date: "2024-02-18", taxableAmount: 73500, cgst: 0, sgst: 0, igst: 13230, totalAmount: 86730, status: "mismatch", confidenceScore: 31 },
-  { _id: "inv012", invoiceNumber: "INV-2024-0074", gstin: "29AAACT2345V1Z5", vendorName: "TechParts India Ltd", date: "2024-02-14", taxableAmount: 22100, cgst: 1989, sgst: 1989, igst: 0, totalAmount: 26078, status: "matched", confidenceScore: 85 },
+/**
+ * GTax AI — Central In-Memory Data Store
+ *
+ * Routes import getter functions (getInvoices / getVendors / getAlerts)
+ * so they always read the current mutable state — no stale snapshots.
+ */
+
+import {
+  reconcileInvoice,
+  calcVendorComplianceScore,
+  vendorRiskLevel,
+  calcTotalITC,
+  calcITCAtRisk,
+  calcHealthScore,
+} from "../utils/gstLogic.js";
+
+// ─── Single mutable store object ─────────────────────────────────────────────
+export const store = {
+  invoices: [],
+  vendors:  [],
+  alerts:   [],
+  gstr2b:   [],
+};
+
+// ─── Getter functions (used by routes) ───────────────────────────────────────
+export const getInvoices = () => store.invoices;
+export const getVendors  = () => store.vendors;
+export const getAlerts   = () => store.alerts;
+
+// ─── Seed data ────────────────────────────────────────────────────────────────
+store.invoices = [
+  { _id: "inv001", invoiceNumber: "INV-2024-001", vendorName: "Tata Supplies Ltd",   gstin: "27AABCT3518Q1ZV", date: "2024-04-05", taxableAmount: 50000,  cgst: 4500,  sgst: 4500,  igst: 0,     totalAmount: 59000,  status: "matched",  confidenceScore: 97 },
+  { _id: "inv002", invoiceNumber: "INV-2024-002", vendorName: "Reliance Traders",    gstin: "27AABCR1234Q1ZV", date: "2024-04-08", taxableAmount: 120000, cgst: 10800, sgst: 10800, igst: 0,     totalAmount: 141600, status: "mismatch", confidenceScore: 42 },
+  { _id: "inv003", invoiceNumber: "INV-2024-003", vendorName: "Infosys Vendors",     gstin: "29AABCI1234Q1ZV", date: "2024-04-10", taxableAmount: 75000,  cgst: 0,     sgst: 0,     igst: 13500, totalAmount: 88500,  status: "matched",  confidenceScore: 96 },
+  { _id: "inv004", invoiceNumber: "INV-2024-004", vendorName: "Sun Pharma Supplies", gstin: "24AABCS1234Q1ZV", date: "2024-04-12", taxableAmount: 30000,  cgst: 2700,  sgst: 2700,  igst: 0,     totalAmount: 35400,  status: "pending",  confidenceScore: 60 },
+  { _id: "inv005", invoiceNumber: "INV-2024-005", vendorName: "Mahindra Parts",      gstin: "27AABCM1234Q1ZV", date: "2024-04-15", taxableAmount: 95000,  cgst: 8550,  sgst: 8550,  igst: 0,     totalAmount: 112100, status: "mismatch", confidenceScore: 38 },
+  { _id: "inv006", invoiceNumber: "INV-2024-006", vendorName: "Wipro Services",      gstin: "29AABCW1234Q1ZV", date: "2024-05-02", taxableAmount: 60000,  cgst: 0,     sgst: 0,     igst: 10800, totalAmount: 70800,  status: "matched",  confidenceScore: 95 },
+  { _id: "inv007", invoiceNumber: "INV-2024-007", vendorName: "HDFC Vendors",        gstin: "27AABCH1234Q1ZV", date: "2024-05-08", taxableAmount: 45000,  cgst: 4050,  sgst: 4050,  igst: 0,     totalAmount: 53100,  status: "matched",  confidenceScore: 98 },
+  { _id: "inv008", invoiceNumber: "INV-2024-008", vendorName: "Bajaj Electricals",   gstin: "27AABCB1234Q1ZV", date: "2024-05-14", taxableAmount: 80000,  cgst: 7200,  sgst: 7200,  igst: 0,     totalAmount: 94400,  status: "mismatch", confidenceScore: 55 },
+  { _id: "inv009", invoiceNumber: "INV-2024-009", vendorName: "Asian Paints",        gstin: "27AABCA1234Q1ZV", date: "2024-05-20", taxableAmount: 25000,  cgst: 2250,  sgst: 2250,  igst: 0,     totalAmount: 29500,  status: "pending",  confidenceScore: 65 },
+  { _id: "inv010", invoiceNumber: "INV-2024-010", vendorName: "Tata Supplies Ltd",   gstin: "27AABCT3518Q1ZV", date: "2024-06-03", taxableAmount: 110000, cgst: 9900,  sgst: 9900,  igst: 0,     totalAmount: 129800, status: "matched",  confidenceScore: 97 },
+  { _id: "inv011", invoiceNumber: "INV-2024-011", vendorName: "Reliance Traders",    gstin: "27AABCR1234Q1ZV", date: "2024-06-10", taxableAmount: 55000,  cgst: 4950,  sgst: 4950,  igst: 0,     totalAmount: 64900,  status: "mismatch", confidenceScore: 30 },
+  { _id: "inv012", invoiceNumber: "INV-2024-012", vendorName: "Infosys Vendors",     gstin: "29AABCI1234Q1ZV", date: "2024-06-18", taxableAmount: 90000,  cgst: 0,     sgst: 0,     igst: 16200, totalAmount: 106200, status: "matched",  confidenceScore: 94 },
 ];
 
-export const gstr2b = [];
+// ─── Internal builders ────────────────────────────────────────────────────────
 
-// Mutate in-place — routes imported these array references at startup.
-// splice keeps the same reference alive so all importers see the new rows.
-export function setInvoices(newRows) {
-  invoices.splice(0, invoices.length, ...newRows);
-}
-
-export function setGstr2b(newRows) {
-  gstr2b.splice(0, gstr2b.length, ...newRows);
-}
-
-// Derives all chart data from whatever is currently in the invoices array.
-// Called by summary.js on every GET so the response always reflects uploads.
-const MONTH_ORDER = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-
-export function getComputedSummary() {
-  const matched    = invoices.filter((i) => i.status === "matched").length;
-  const mismatched = invoices.filter((i) => i.status === "mismatch").length;
-  const pending    = invoices.filter((i) => i.status === "pending").length;
-  const total      = invoices.length;
-
-  const totalITC   = invoices.reduce((s, i) => s + (Number(i.cgst) + Number(i.sgst) + Number(i.igst)), 0);
-  const itcAtRisk  = invoices
-    .filter((i) => i.status === "mismatch")
-    .reduce((s, i) => s + (Number(i.cgst) + Number(i.sgst) + Number(i.igst)), 0);
-  const gstPayable = invoices.reduce((s, i) => s + Number(i.taxableAmount) * 0.18, 0);
-  const healthScore = total > 0 ? Math.round((matched / total) * 100) : 0;
-
-  // Monthly reconciliation buckets
-  const reconMap = {};
-  invoices.forEach((inv) => {
-    const month = new Date(inv.date).toLocaleString("en-IN", { month: "short" });
-    if (!reconMap[month]) reconMap[month] = { month, matched: 0, mismatch: 0, pending: 0 };
-    if (inv.status === "matched")       reconMap[month].matched++;
-    else if (inv.status === "mismatch") reconMap[month].mismatch++;
-    else                                reconMap[month].pending++;
+function buildVendors(invList) {
+  const map = {};
+  invList.forEach((inv) => {
+    const key = inv.gstin || inv.vendorName;
+    if (!map[key]) {
+      map[key] = {
+        _id: `vendor_${key}`,
+        name: inv.vendorName || "Unknown",
+        gstin: inv.gstin || key,
+        totalInvoices: 0,
+        mismatchCount: 0,
+      };
+    }
+    map[key].totalInvoices++;
+    if (inv.status === "mismatch") map[key].mismatchCount++;
   });
-  const monthlyReconciliation = Object.values(reconMap).sort(
-    (a, b) => MONTH_ORDER.indexOf(a.month) - MONTH_ORDER.indexOf(b.month)
-  );
+  return Object.values(map).map((v) => {
+    const score = calcVendorComplianceScore(v);
+    return { ...v, complianceScore: score, riskLevel: vendorRiskLevel(score) };
+  });
+}
 
-  // ITC risk trend buckets
-  const itcMap = {};
-  invoices
-    .filter((i) => i.status === "mismatch")
-    .forEach((inv) => {
-      const month = new Date(inv.date).toLocaleString("en-IN", { month: "short" });
-      if (!itcMap[month]) itcMap[month] = { month, amount: 0 };
-      itcMap[month].amount += Number(inv.cgst) + Number(inv.sgst) + Number(inv.igst);
+function buildAlerts(invList, vendorList) {
+  const result = [];
+  let idx = 1;
+
+  const mismatched = invList.filter((i) => i.status === "mismatch");
+  if (mismatched.length > 0) {
+    const itcRisk = calcITCAtRisk(invList);
+    result.push({
+      _id: `alert_${idx++}`,
+      type: "ITC_MISMATCH",
+      message: `${mismatched.length} invoice(s) mismatched. ₹${(itcRisk / 100000).toFixed(2)}L ITC at risk.`,
+      severity: itcRisk > 50000 ? "High" : "Medium",
+      date: new Date().toISOString().split("T")[0],
+      status: "open",
     });
-  const itcRiskTrend = Object.values(itcMap).sort(
-    (a, b) => MONTH_ORDER.indexOf(a.month) - MONTH_ORDER.indexOf(b.month)
-  );
+  }
+
+  vendorList.filter((v) => v.riskLevel === "High").forEach((v) => {
+    result.push({
+      _id: `alert_${idx++}`,
+      type: "VENDOR_RISK",
+      message: `Vendor "${v.name}" has compliance score ${v.complianceScore}/100 — ${v.mismatchCount} mismatch(es).`,
+      severity: "High",
+      date: new Date().toISOString().split("T")[0],
+      status: "open",
+    });
+  });
+
+  const pending = invList.filter((i) => i.status === "pending");
+  if (pending.length > 0) {
+    result.push({
+      _id: `alert_${idx++}`,
+      type: "RECONCILE",
+      message: `${pending.length} invoice(s) pending reconciliation against GSTR-2B.`,
+      severity: "Medium",
+      date: new Date().toISOString().split("T")[0],
+      status: "open",
+    });
+  }
+
+  return result;
+}
+
+function buildMonthlyReconciliation(invList) {
+  const map = {};
+  invList.forEach((inv) => {
+    const d = new Date(inv.date);
+    if (isNaN(d)) return;
+    const month = d.toLocaleString("en-IN", { month: "short", year: "2-digit" });
+    if (!map[month]) map[month] = { month, matched: 0, mismatch: 0, pending: 0, _ts: d.getTime() };
+    if (inv.status === "matched")       map[month].matched++;
+    else if (inv.status === "mismatch") map[month].mismatch++;
+    else                                map[month].pending++;
+  });
+  return Object.values(map)
+    .sort((a, b) => a._ts - b._ts)
+    .map(({ _ts, ...rest }) => rest);
+}
+
+function buildITCRiskTrend(invList) {
+  const map = {};
+  invList
+    .filter((inv) => inv.status === "mismatch")
+    .forEach((inv) => {
+      const d = new Date(inv.date);
+      if (isNaN(d)) return;
+      const month = d.toLocaleString("en-IN", { month: "short", year: "2-digit" });
+      if (!map[month]) map[month] = { month, amount: 0, _ts: d.getTime() };
+      map[month].amount += (inv.cgst || 0) + (inv.sgst || 0) + (inv.igst || 0);
+    });
+  return Object.values(map)
+    .sort((a, b) => a._ts - b._ts)
+    .map(({ _ts, ...rest }) => rest);
+}
+
+function rebuildDerived() {
+  store.vendors = buildVendors(store.invoices);
+  store.alerts  = buildAlerts(store.invoices, store.vendors);
+}
+
+// Seed derived data on startup
+rebuildDerived();
+
+// ─── Summary ──────────────────────────────────────────────────────────────────
+export function getComputedSummary() {
+  const inv                = store.invoices;
+  const totalInvoices      = inv.length;
+  const matchedInvoices    = inv.filter((i) => i.status === "matched").length;
+  const mismatchedInvoices = inv.filter((i) => i.status === "mismatch").length;
+  const pendingInvoices    = inv.filter((i) => i.status === "pending").length;
+  const totalITC           = calcTotalITC(inv);
+  const itcAtRisk          = calcITCAtRisk(inv);
+  const gstPayable         = inv
+    .filter((i) => i.status === "matched")
+    .reduce((s, i) => s + (i.taxableAmount || 0) * 0.18, 0);
+  const healthScore        = calcHealthScore(totalInvoices, matchedInvoices, totalITC, itcAtRisk);
 
   return {
-    _id: "sum_computed",
-    period: "Uploaded Data",
-    totalInvoices: total,
-    matchedInvoices: matched,
-    mismatchedInvoices: mismatched,
-    pendingInvoices: pending,
+    period: "FY 2024-25",
+    totalInvoices,
+    matchedInvoices,
+    mismatchedInvoices,
+    pendingInvoices,
     totalITC,
     itcAtRisk,
     gstPayable,
     healthScore,
-    monthlyReconciliation,
-    itcRiskTrend,
+    monthlyReconciliation: buildMonthlyReconciliation(inv),
+    itcRiskTrend: buildITCRiskTrend(inv),
   };
 }
 
-export const vendors = [
-  { _id: "ven001", name: "Bharat Steel Works", gstin: "08AABCB3456P1Z7", complianceScore: 94, riskLevel: "Low", totalInvoices: 28, mismatchCount: 1 },
-  { _id: "ven002", name: "Rajesh Traders", gstin: "27AAAPR4567L1Z8", complianceScore: 82, riskLevel: "Low", totalInvoices: 19, mismatchCount: 2 },
-  { _id: "ven003", name: "Apex Supplies Pvt Ltd", gstin: "29AABCA1234F1Z5", complianceScore: 76, riskLevel: "Low", totalInvoices: 34, mismatchCount: 4 },
-  { _id: "ven004", name: "Pioneer Components", gstin: "06AACCP8901R1Z3", complianceScore: 71, riskLevel: "Medium", totalInvoices: 22, mismatchCount: 3 },
-  { _id: "ven005", name: "Sunrise Metals Pvt", gstin: "29AAACS9012S1Z6", complianceScore: 64, riskLevel: "Medium", totalInvoices: 15, mismatchCount: 4 },
-  { _id: "ven006", name: "TechParts India Ltd", gstin: "33AACCT7890N1Z4", complianceScore: 61, riskLevel: "Medium", totalInvoices: 18, mismatchCount: 5 },
-  { _id: "ven007", name: "Metro Fasteners Ltd", gstin: "19AABCM0123T1Z9", complianceScore: 58, riskLevel: "Medium", totalInvoices: 11, mismatchCount: 3 },
-  { _id: "ven008", name: "Krishna Distributors", gstin: "29AACKD6789Q1Z1", complianceScore: 51, riskLevel: "High", totalInvoices: 24, mismatchCount: 9 },
-  { _id: "ven009", name: "Nirma Industrial Co", gstin: "24AADCN5678K1Z2", complianceScore: 38, riskLevel: "High", totalInvoices: 16, mismatchCount: 8 },
-  { _id: "ven010", name: "Royal Chemicals Co", gstin: "27AADCR1234U1Z2", complianceScore: 34, riskLevel: "High", totalInvoices: 9, mismatchCount: 6 },
-  { _id: "ven011", name: "Sri Durga Enterprises", gstin: "36AABCS2345M1Z0", complianceScore: 21, riskLevel: "High", totalInvoices: 7, mismatchCount: 5 },
-];
+// ─── Setters (called by upload route) ─────────────────────────────────────────
+export function setInvoices(rows) {
+  store.invoices = rows.map((row, i) => {
+    const totalAmount   = parseFloat(row["Total Amount"]   || row["total_amount"]   || row["totalAmount"]   || row["Invoice Value"] || 0);
+    const taxableAmount = parseFloat(row["Taxable Amount"]  || row["taxable_amount"]  || row["taxableAmount"]  || row["Taxable Value"] || totalAmount / 1.18);
+    const cgst          = parseFloat(row["CGST"]  || row["cgst"]  || 0);
+    const sgst          = parseFloat(row["SGST"]  || row["sgst"]  || 0);
+    const igst          = parseFloat(row["IGST"]  || row["igst"]  || 0);
+    const gstin         = String(row["GSTIN"]          || row["gstin"]          || row["Supplier GSTIN"] || "");
+    const vendorName    = String(row["Vendor Name"]    || row["vendor_name"]    || row["Supplier Name"]  || row["Party Name"]     || `Vendor ${i + 1}`);
+    const invoiceNum    = String(row["Invoice Number"] || row["invoice_number"] || row["Invoice No"]     || row["Doc No"]         || `INV-${i + 1}`);
+    const dateRaw       = row["Date"] || row["date"] || row["Invoice Date"] || row["Doc Date"] || "";
+    const date          = dateRaw
+      ? new Date(dateRaw).toISOString().split("T")[0]
+      : new Date().toISOString().split("T")[0];
 
-export const alerts = [
-  { _id: "alt001", type: "ITC_MISMATCH", message: "INV-2024-0101: GSTIN mismatch detected — vendor portal shows ₹3,240 variance in IGST", severity: "High", date: "2024-03-19", status: "open" },
-  { _id: "alt002", type: "VENDOR_RISK", message: "Sri Durga Enterprises filed 3 consecutive nil returns — ITC claim of ₹12,204 at risk", severity: "High", date: "2024-03-19", status: "open" },
-  { _id: "alt003", type: "FILING_DUE", message: "GSTR-3B due in 12 days (Apr 20, 2024) — 5 invoices still pending reconciliation", severity: "High", date: "2024-03-18", status: "open" },
-  { _id: "alt004", type: "ITC_MISMATCH", message: "INV-2024-0108: IGST amount ₹5,760 doesn't match GSTR-2B entry by ₹576 (10% variance)", severity: "Medium", date: "2024-03-18", status: "open" },
-  { _id: "alt005", type: "VENDOR_RISK", message: "Krishna Distributors compliance score dropped from 74 → 51 this month", severity: "Medium", date: "2024-03-17", status: "open" },
-  { _id: "alt006", type: "ITC_MISMATCH", message: "INV-2024-0077: Royal Chemicals Co — GSTIN inactive on GST portal as of Mar 15", severity: "High", date: "2024-03-16", status: "open" },
-  { _id: "alt007", type: "RECONCILE", message: "Auto-reconciliation completed: 187 matched, 41 mismatch, 20 pending out of 248 invoices", severity: "Low", date: "2024-03-15", status: "resolved" },
-];
+    const g2b = store.gstr2b.find((g) => {
+      const g2bNum = String(g["Invoice Number"] || g["invoice_number"] || g["Doc No"] || "");
+      const g2bGst = String(g["GSTIN"] || g["gstin"] || "");
+      const g2bAmt = parseFloat(g["Total Amount"] || g["total_amount"] || g["Invoice Value"] || 0);
+      return (
+        g2bNum.toLowerCase() === invoiceNum.toLowerCase() ||
+        (g2bGst.toLowerCase() === gstin.toLowerCase() &&
+          totalAmount > 0 &&
+          Math.abs(g2bAmt - totalAmount) / totalAmount < 0.02)
+      );
+    });
+
+    const recon = reconcileInvoice(
+      { totalAmount, cgst, sgst, igst, taxableAmount },
+      g2b
+        ? {
+            totalAmount: parseFloat(g2b["Total Amount"] || g2b["total_amount"] || g2b["Invoice Value"] || 0),
+            cgst: parseFloat(g2b["CGST"] || g2b["cgst"] || 0),
+            sgst: parseFloat(g2b["SGST"] || g2b["sgst"] || 0),
+            igst: parseFloat(g2b["IGST"] || g2b["igst"] || 0),
+          }
+        : null
+    );
+
+    const status          = store.gstr2b.length === 0 ? "pending"  : recon.status;
+    const confidenceScore = store.gstr2b.length === 0 ? 70         : recon.confidenceScore;
+
+    return {
+      _id: `inv_${i + 1}`,
+      invoiceNumber: invoiceNum,
+      vendorName,
+      gstin,
+      date,
+      taxableAmount,
+      cgst,
+      sgst,
+      igst,
+      totalAmount,
+      status,
+      confidenceScore,
+    };
+  });
+  rebuildDerived();
+}
+
+export function setGstr2b(rows) {
+  store.gstr2b = rows;
+  // Re-reconcile existing invoices against new GSTR-2B data
+  if (store.invoices.length > 0) {
+    setInvoices(
+      store.invoices.map((inv) => ({
+        "Invoice Number": inv.invoiceNumber,
+        "Vendor Name":    inv.vendorName,
+        "GSTIN":          inv.gstin,
+        "Date":           inv.date,
+        "Taxable Amount": inv.taxableAmount,
+        "CGST":           inv.cgst,
+        "SGST":           inv.sgst,
+        "IGST":           inv.igst,
+        "Total Amount":   inv.totalAmount,
+      }))
+    );
+  }
+}

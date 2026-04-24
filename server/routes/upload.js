@@ -1,98 +1,99 @@
 import express from "express";
 import multer from "multer";
 import XLSX from "xlsx";
-import { setInvoices, setGstr2b } from "../data/gstData.js";
+import { setInvoices, setGstr2b, getInvoices } from "../data/gstData.js";
 
 const router = express.Router();
 
-// Keep file in memory, so we do not need to save it on disk
+// ── Multer — memory storage, 10 MB limit ─────────────────────────────────────
 const storage = multer.memoryStorage();
 
 const upload = multer({
   storage,
   limits: { fileSize: 10 * 1024 * 1024 },
-  fileFilter: (req, file, cb) => {
-    const allowed = [
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", // .xlsx
-      "application/vnd.ms-excel", // .xls
-      "text/csv", // .csv
-      "application/csv",
-      "text/plain",
-    ];
+  fileFilter: (_req, file, cb) => {
+    const ext = file.originalname
+      .slice(file.originalname.lastIndexOf("."))
+      .toLowerCase();
+    const allowedExts = [".csv", ".xlsx", ".xls"];
 
-    if (allowed.includes(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(new Error("Only Excel and CSV files are allowed"));
+    // Always allow by extension — MIME type is unreliable across browsers/OS.
+    // e.g. Chrome on Windows sends text/plain for CSV; some OS sends "".
+    if (allowedExts.includes(ext)) {
+      return cb(null, true);
     }
+
+    cb(new Error(`Unsupported file type "${ext}". Use .csv, .xlsx, or .xls`));
   },
 });
 
-// Works for both Excel and CSV files
+// ── Parse Excel / CSV buffer into row objects ─────────────────────────────────
 function parseFileBuffer(buffer) {
-  const workbook = XLSX.read(buffer, {
-    type: "buffer",
-    raw: true,
-  });
-
+  const workbook = XLSX.read(buffer, { type: "buffer" });
   const sheetName = workbook.SheetNames[0];
   const sheet = workbook.Sheets[sheetName];
   const rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
-
-  return {
-    sheetName,
-    rowCount: rows.length,
-    rows,
-  };
+  return { sheetName, rowCount: rows.length, rows };
 }
 
-// POST /upload/invoices
-// POST /upload/gstr2b
-router.post("/:type", upload.single("file"), (req, res) => {
-  try {
-    const { type } = req.params;
+// ── POST /upload/invoices  |  POST /upload/gstr2b ─────────────────────────────
+//
+// Using the callback form of upload.single() so multer errors (wrong MIME,
+// file too large, etc.) are caught and returned as proper JSON — not 500 crashes.
+//
+router.post("/:type", (req, res) => {
+  const { type } = req.params;
 
-    if (!["invoices", "gstr2b"].includes(type)) {
+  if (!["invoices", "gstr2b"].includes(type)) {
+    return res
+      .status(400)
+      .json({ success: false, message: "Type must be 'invoices' or 'gstr2b'" });
+  }
+
+  // Run multer manually so we can intercept its errors
+  upload.single("file")(req, res, (multerErr) => {
+    if (multerErr) {
+      console.error("Multer error:", multerErr.message);
       return res.status(400).json({
         success: false,
-        message: "Type must be either 'invoices' or 'gstr2b'",
+        message: multerErr.message ?? "File upload error",
       });
     }
 
     if (!req.file) {
       return res.status(400).json({
         success: false,
-        message: "No file uploaded",
+        message:
+          'No file received. Make sure the form field is named "file" and Content-Type is multipart/form-data.',
       });
     }
 
-    const result = parseFileBuffer(req.file.buffer);
+    try {
+      const result = parseFileBuffer(req.file.buffer);
 
-    // Mutate in-place so all route imports see the new data immediately
-    if (type === "invoices") {
-      setInvoices(result.rows);
-    } else {
-      setGstr2b(result.rows);
+      if (type === "invoices") {
+        setInvoices(result.rows);
+      } else {
+        setGstr2b(result.rows);
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: `${type} uploaded and reconciled successfully`,
+        type,
+        fileName: req.file.originalname,
+        sheetName: result.sheetName,
+        rowCount: result.rowCount,
+        data: getInvoices(),
+      });
+    } catch (parseErr) {
+      console.error("Parse error:", parseErr);
+      return res.status(500).json({
+        success: false,
+        message: `Failed to parse file: ${parseErr.message}`,
+      });
     }
-
-    return res.status(200).json({
-      success: true,
-      message: `${type} file uploaded and parsed successfully`,
-      type,
-      fileName: req.file.originalname,
-      sheetName: result.sheetName,
-      rowCount: result.rowCount,
-      data: result.rows,
-    });
-  } catch (error) {
-    console.error("Upload error:", error);
-
-    return res.status(500).json({
-      success: false,
-      message: "Failed to parse file",
-      error: error.message,
-    });
-  }
+  });
 });
 
 export default router;

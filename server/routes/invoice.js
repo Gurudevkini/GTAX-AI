@@ -1,13 +1,12 @@
 import express from "express";
-import { invoices } from "../data/gstData.js";
+import { getInvoices } from "../data/gstData.js";
 
 const router = express.Router();
 
-// GET /invoice/invoices — all invoices
+// GET /invoice/invoices
 router.get("/invoices", async (req, res) => {
   try {
-    // Production: await Invoice.find().sort({ date: -1 })
-    res.status(200).json(invoices);
+    res.status(200).json(getInvoices());
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -16,7 +15,7 @@ router.get("/invoices", async (req, res) => {
 // GET /invoice/invoices/:id
 router.get("/invoices/:id", async (req, res) => {
   try {
-    const inv = invoices.find((i) => i._id === req.params.id);
+    const inv = getInvoices().find((i) => i._id === req.params.id);
     if (!inv) return res.status(404).json({ message: "Invoice not found" });
     res.status(200).json(inv);
   } catch (error) {
@@ -24,11 +23,10 @@ router.get("/invoices/:id", async (req, res) => {
   }
 });
 
-// POST /invoice/reconcile — run reconciliation on all pending invoices
+// POST /invoice/reconcile
 router.post("/reconcile", async (req, res) => {
   try {
-    // Production: fetch from GSTR-2B portal API and reconcile
-    // For MVP: simulate by returning reconciliation results from mock data
+    const invoices = getInvoices();
     const results = invoices.map((inv) => ({
       invoiceNumber: inv.invoiceNumber,
       vendorName: inv.vendorName,
@@ -36,14 +34,12 @@ router.post("/reconcile", async (req, res) => {
       confidenceScore: inv.confidenceScore,
       totalAmount: inv.totalAmount,
     }));
-
     const summary = {
       total: invoices.length,
       matched: invoices.filter((i) => i.status === "matched").length,
       mismatch: invoices.filter((i) => i.status === "mismatch").length,
       pending: invoices.filter((i) => i.status === "pending").length,
     };
-
     res.status(200).json({ results, summary });
   } catch (error) {
     res.status(500).json({ message: error.message });
