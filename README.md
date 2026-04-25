@@ -11,11 +11,19 @@
 ---
 
 ## 📽️ Project Preview
+<p align="center">
+  <img 
+    src="https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExb2V3eW1uZ3Z4Z2R5c2p6Z2R6b3V2b3p0c2R1eW5nZzBqM2JtYyZlcD12MV9naWZzX3NlYXJjaCZjdD1n/coxQHKASG60HrHtvkt/giphy.gif" 
+    alt="Dashboard Animation"
+    width="800"
+    style="border-radius:12px;"
+  />
+</p>
 
-![GTax AI Dashboard Placeholder](https://via.placeholder.com/1200x600?text=GTax+AI+Dashboard+Preview)
-*The interactive dashboard providing real-time GST health scores and invoice insights.*
-
----
+<p align="center">
+  <b>GTax AI Dashboard Preview</b><br/>
+  <sub>The interactive dashboard providing real-time GST health scores and invoice insights.</sub>
+</p>
 
 ## 🧠 The Problem
 Small businesses frequently encounter critical bottlenecks in GST management:
