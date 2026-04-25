@@ -10,7 +10,7 @@ const users = [];
 // POST /auth/register
 router.post("/register", async (req, res) => {
   try {
-    const { firstName, lastName, email, gstin, password } = req.body;
+    const { firstName, lastName, email, gstin, phoneNumber, password } = req.body;
 
     if (!firstName || !email || !password)
       return res.status(400).json({ success: false, message: "firstName, email and password are required." });
@@ -25,6 +25,7 @@ router.post("/register", async (req, res) => {
       lastName: lastName || "",
       email: email.toLowerCase(),
       gstin: gstin || "",
+      phoneNumber: phoneNumber || "",
       planType: "free",
       profileImage: "",
       usageCount: 0,
@@ -88,6 +89,7 @@ router.post("/update", (req, res) => {
       planType: req.body.planType ?? baseUser.planType,
       profileImage: req.body.profileImage !== undefined ? req.body.profileImage : baseUser.profileImage,
       usageCount: req.body.usageCount !== undefined ? req.body.usageCount : baseUser.usageCount,
+      phoneNumber: req.body.phoneNumber !== undefined ? req.body.phoneNumber : baseUser.phoneNumber,
       hasCompletedOnboarding: req.body.hasCompletedOnboarding !== undefined ? req.body.hasCompletedOnboarding : baseUser.hasCompletedOnboarding,
     };
 

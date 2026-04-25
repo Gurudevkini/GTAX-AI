@@ -13,6 +13,7 @@ const Register = () => {
     lastName: "",
     email: "",
     gstin: "",
+    phoneNumber: "",
     password: "",
   });
   const [error, setError] = useState("");
@@ -163,6 +164,17 @@ const Register = () => {
             onChange={set("gstin")}
             style={{ ...inputStyle, fontFamily: "IBM Plex Mono, monospace", fontSize: "12px" }}
             maxLength={15}
+          />
+        </Box>
+
+        <Box mb="1rem">
+          <Label text="Phone Number" />
+          <input
+            type="tel"
+            placeholder="9876543210"
+            value={form.phoneNumber}
+            onChange={set("phoneNumber")}
+            style={inputStyle}
           />
         </Box>
 

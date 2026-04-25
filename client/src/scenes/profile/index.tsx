@@ -1,10 +1,12 @@
-import { Box, Typography, useTheme, Button, TextField } from "@mui/material";
+import { Box, Typography, useTheme, Button, TextField, Snackbar, Alert } from "@mui/material";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import FlexBetween from "@/components/FlexBetween";
 import { useUpdateUserMutation } from "@/state/api";
 
 const Profile = () => {
   const { palette } = useTheme();
+  const navigate = useNavigate();
   // Parse the current logged-in user
   const user = JSON.parse(localStorage.getItem("gtax_user") || "{}");
   const [updateUser] = useUpdateUserMutation();
@@ -16,7 +18,9 @@ const Profile = () => {
   const [formData, setFormData] = useState({
     firstName: user?.firstName || "",
     gstin: user?.gstin || "",
+    phoneNumber: user?.phoneNumber || "",
   });
+  const [openAlert, setOpenAlert] = useState(false);
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -40,10 +44,23 @@ const Profile = () => {
     stored.profileImage = profileImage;
     stored.firstName = formData.firstName;
     stored.gstin = formData.gstin;
+    stored.phoneNumber = formData.phoneNumber;
     localStorage.setItem("gtax_user", JSON.stringify(stored));
     
-    // 3. Immediately refresh the app to propagate the new avatar to the Navbar
-    window.location.reload();
+    // 3. Show success alert instead of reloading immediately
+    setOpenAlert(true);
+
+    // 4. Redirect to dashboard after a short delay so user sees the message
+    setTimeout(() => {
+      navigate("/");
+    }, 1500);
+  };
+
+  const handleCloseAlert = (event?: React.SyntheticEvent | Event, reason?: string) => {
+    if (reason === 'clickaway') {
+      return;
+    }
+    setOpenAlert(false);
   };
 
   const handleSignOut = () => {
@@ -118,6 +135,14 @@ const Profile = () => {
             InputLabelProps={{ style: { color: palette.grey[500] } }}
             sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}
           />
+          <TextField
+            fullWidth label="Phone Number" variant="outlined"
+            value={formData.phoneNumber}
+            onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
+            InputProps={{ style: { color: "white" } }}
+            InputLabelProps={{ style: { color: palette.grey[500] } }}
+            sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}
+          />
 
           <Box mt="1rem" p="1rem" borderRadius="8px" border={`1px solid ${palette.primary[500]}`} bgcolor="rgba(18,239,200,0.05)">
             <Typography variant="h5" color={palette.primary[400]} fontWeight={600} mb="0.5rem">Current Plan</Typography>
@@ -136,6 +161,12 @@ const Profile = () => {
         </Box>
 
       </FlexBetween>
+
+      <Snackbar open={openAlert} autoHideDuration={3000} onClose={handleCloseAlert} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
+        <Alert onClose={handleCloseAlert} severity="success" sx={{ width: '100%', bgcolor: palette.primary[500], color: "#000", fontWeight: 600 }}>
+          Profile changes saved successfully!
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };
